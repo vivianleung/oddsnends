@@ -20,7 +20,7 @@ from typing import Annotated, Any, Generic, TypeVar, Union
 import numpy as np
 import pandas as pd
 
-from genomicspy.utils import calc_intervals, default
+from oddsnends.utils import calc_intervals, default
 
 SeriesType = TypeVar("SeriesType")
 
