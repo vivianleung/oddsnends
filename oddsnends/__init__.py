@@ -1,3 +1,3 @@
 from .math import *
-from .misc import *
+from .main import *
 from .pdtools import *

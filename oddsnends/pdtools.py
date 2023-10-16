@@ -1,18 +1,7 @@
 # pdtools.py
 
 # pandas tools
-
-__all__ = ["Hashable",
-           "check_if_exists",
-           "get_level_uniques",
-           "pivot_indexed_table",
-           "ranges2locs",
-           "reorder_cols",
-           "set_ranges",
-           "sort_levels",
-           ]
-
-
+from __future__ import annotations
 import logging
 from collections.abc import Collection, Hashable, MutableSequence
 from typing import Annotated, Any, Generic, TypeVar, Union
@@ -20,7 +9,18 @@ from typing import Annotated, Any, Generic, TypeVar, Union
 import numpy as np
 import pandas as pd
 
-from oddsnends.utils import calc_intervals, default
+from oddsnends.main import calc_intervals, default
+
+
+__all__ = ["SeriesType",
+           "check_if_exists",
+           "pipe_concat",
+           "get_level_uniques",
+           "pivot_indexed_table",
+           "reorder_cols",
+           "sort_levels",
+           ]
+
 
 SeriesType = TypeVar("SeriesType")
 
@@ -78,25 +78,10 @@ def get_level_uniques(df: Union[pd.MultiIndex, pd.Series, pd.DataFrame],
 
     return index.levels[level[0]].values
 
-def set_ranges(ranges1: Union[pd.DataFrame, Collection[tuple[int, int]]],
-               ranges2: Union[pd.DataFrame, Collection[tuple[int, int]]],
-               col_start: str = "start",
-               col_end: str = "end",
-               how=Annotated[str, "both", "right_only", "left_only"]):
-    """Compare two list of ranges and calculate different sets of intervals"""
-        
-    locs1 = ranges2locs(ranges1, col_start=col_start, col_end=col_end)
-    locs2 = ranges2locs(ranges2, col_start=col_start, col_end=col_end)
-    
-    
-    intervals = (
-        pd.merge(locs1, locs2, how="outer", indicator=True)
-        .pipe(lambda df: df.loc[df["_merge"] == how])
-        .squeeze(axis=1)
-        .pipe(lambda ser: pd.DataFrame(calc_intervals(ser),
-                                       columns=[col_start, col_end]))
-    )
-    return intervals
+
+def pipe_concat(*objs: Union[pd.Series, pd.DataFrame], **kws):
+    """A pipe-able way to concat"""
+    return pd.concat(objs, **kws)
 
 
 def pivot_indexed_table(df: pd.DataFrame, *args, **kwargs) -> pd.DataFrame:
@@ -120,25 +105,6 @@ def pivot_indexed_table(df: pd.DataFrame, *args, **kwargs) -> pd.DataFrame:
 
     return pivoted
 
-def ranges2locs(values: Collection['tuple[int, int]'],
-                col_start: str = "start", 
-                col_end: str = "end",
-                name: str = "loc") -> pd.Series:
-    """Breaks down list of ranges into individual positions"""
-    
-    if not isinstance(values, pd.DataFrame):
-        values = pd.DataFrame(values, columns=[col_start, col_end])
-    
-    res = (
-        values
-        .apply(lambda ser: range(ser[col_start] - 1, ser[col_end]), axis=1)
-        .explode()
-        .drop_duplicates()
-        .dropna()
-        .rename(name)
-    )
-    
-    return res
 
 def reorder_cols(df: pd.DataFrame,
                  first: Union[Hashable, Collection[Hashable], pd.Index] = None,
