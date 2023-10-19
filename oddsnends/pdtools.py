@@ -9,7 +9,7 @@ from typing import Annotated, Any, Generic, TypeVar, Union
 import numpy as np
 import pandas as pd
 
-from oddsnends.main import calc_intervals, default
+from oddsnends.main import default
 
 
 __all__ = ["SeriesType",
@@ -24,14 +24,6 @@ __all__ = ["SeriesType",
 
 SeriesType = TypeVar("SeriesType")
 
-# H = TypeVar("H", Hashable)
-# A = TypeVar("A", Any)
-
-# class SeriesType(Generic[H, A]):
-#     """pandas.Series type"""
-#     def __init__(self, index: H, value: A):
-#         self.index = index
-#         self.value = value
         
 def check_if_exists(labels: list, index: pd.Index,
                     errors: Annotated[str, 'ignore', 'warn', 'raise'] = 'ignore'
