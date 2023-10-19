@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "oddsnends"
 
-version = "0.1.1dev0"
+version = "0.1.1dev1"
 
 authors = [
   { name="Vivian Leung", email="leung.vivian.w@gmail.com" },
