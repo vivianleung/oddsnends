@@ -4,6 +4,8 @@
 
 from setuptools import setup, find_packages
 
+version = '0.1.1dev2'
+
 with open('README.rst') as readme_file:
     readme = readme_file.read()
 
@@ -41,6 +43,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/vivianleung/oddsnends',
-    version='0.1.1dev1',
+    version=version,
     zip_safe=False,
 )
