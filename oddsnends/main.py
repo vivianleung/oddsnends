@@ -17,10 +17,10 @@ from pandas.core.generic import NDFrame
 __all__ = [
     "LoggingLevels",
     "NoneType",
-    "Numeric",
     "TwoTupleInts",
     "default",
     "defaults",
+    "is_null",
     "msg",
     "now",
     "parse_literal_eval",
@@ -36,14 +36,13 @@ LoggingLevels = {
     "CRITICAL": 50,
 }
 NoneType = type(None)
-Numeric = Union[int, float]
 TwoTupleInts = tuple[int, int]
 
 
 
 def default(x: Any, default_value: Any = None,
             has_value: Any = lambda x: x,
-            null_values: Annotated[Union[Any, Collection[Any], str], 'null'] = None,
+            null_values: Annotated[Any | Collection[Any] | str, 'null'] = None,
             func_args: Collection = None,
             func_kws: dict = None):
     """General function for checking/returning null/non-null objects.
@@ -93,15 +92,41 @@ def default(x: Any, default_value: Any = None,
         return has_value
 
 
+def _is_null(x: Any,
+             null_values: Collection[Any],
+             empty: bool = True,
+             do_raise: bool = False) -> bool:
+    try:
+        if hasattr(x, "__len__") and empty:
+            assert len(x) > 0
+        
+        try:
+            assert x not in null_values  # "nan is nan" returns True but nan != nan
+        except ValueError:  # raised when comparing pd.NDFrames like this
+            pass
+        
+        for n in null_values:
+            assert x != n
+    
+    
+    except AssertionError as error:
+        if do_raise:
+            raise error
+        return False
 
-def defaults(x: Any, *default_values, **kwargs) -> Any:
+    return True
+
+is_null = _is_null
+
+
+def defaults(value: Any, *default_values, **kwargs) -> Any:
     """Returns value (via. has value) or first non-null default value
 
     Note: can only check if a pd.NDFrame is empty. Cannot check values
 
     Parameters
     ----------
-    x: Any
+    value: Any
         Value to check
     *default_values: Any
         Default values to check (in order) and return the first non-null
@@ -112,7 +137,7 @@ def defaults(x: Any, *default_values, **kwargs) -> Any:
         What to return if value is non-null. If Callable, it should take x as
         the first (positional) arg, then any *func_args, **func_kwargs.
         Default returns x.
-    empty_as_null: bool, default True
+    empty: bool, default True
         Consider empty collections (lists, strs, etc.) as null
     null_values: Collection[Any]
         Values to consider null. Default includes None, np.nan, and empty
@@ -123,50 +148,42 @@ def defaults(x: Any, *default_values, **kwargs) -> Any:
         Kwargs to pass to has_value (if callable)
 
     """
-    def _check_if_null(_x: Any, _dvs: Collection[Any], _null_values: Collection[Any], do_raise: bool = False):
-        try:
-            if len(_dvs) == 0:
-                return _x
 
-            if hasattr(_x, "__len__") and empty_as_null:
-                assert len(_x) > 0
-            else:
-                assert _x not in null_values
-
-        except AssertionError:
-            if do_raise:
-                raise AssertionError(_dvs[0])
-            return _check_if_null(_dvs[1:], _dvs, _null_values)
-
-        return _x
-
-
+    # figure out what counts as a null value
     null_values = kwargs.get("null_values", [None, nan])
     if isinstance(null_values, Hashable):
         null_values = [null_values]
-    empty_as_null = kwargs.get("empty_as_null", True)
+        
+    empty = kwargs.get("empty", True)
 
     # check if x is null
     try:
-        _ = _check_if_null(x, [default_values[0]], null_values, do_raise=True)
-
-    except AssertionError as error:  # null value
-        # get first non-null default value
-        return _check_if_null(error.args[0], default_values[1:], null_values)
-
-    # x is not null, so return has_value
-    try:
-        has_value = kwargs["has_value"]
-        assert callable(kwargs["has_value"])
-    except KeyError:
-        return x
+        is_null = _is_null(value, null_values, empty=empty, do_raise=True)
+        
+        i = 0
+        while is_null:
+            is_null = _is_null(default_values[i], null_values, empty=empty)
+            i += 1
+        return default_values[i]
+    
     except AssertionError:
-        return has_value
+        # x is not null, so return has_value
+        try:
+            has_value = kwargs["has_value"]
+            assert callable(has_value), has_value
+            
+        except KeyError:  # just return x
+            return value                 
+        
+        except AssertionError as error:  # return the fixed value
+            return error.args[0]
 
-    return has_value(
-        x, *kwargs.get("func_args", []), **kwargs.get("func_kws", {}))
-
-
+        return has_value(
+            value, *kwargs.get("func_args", []), **kwargs.get("func_kws", {}))
+            
+    except IndexError:  # x and all default values are null
+        return default_values[-1]
+    
 
 
 def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:

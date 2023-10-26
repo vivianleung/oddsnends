@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import itertools
-from collections.abc import Collection
+from collections.abc import Collection, Hashable
 from typing import Any, Annotated
 
 from pandas import notnull
 
 __all__ = [
+    "AttrDict",
     "agg",
     "dict2list",
     "drop_duplicates",
@@ -16,6 +17,23 @@ __all__ = [
     "simplify",
     "strictcollection",
 ]
+
+
+class AttrDict(dict):
+    """Convenient way to store and access dict as attributes"""
+    def __init__(self, **kws):
+        for k, v in kws.items():
+            setattr(self, k, v)
+    
+    def __getattr__(self, attr: Hashable, **d):
+        return self.__getitem__(attr, **d)
+    
+    def __setattr__(self, attr: Hashable, value: Any):
+        return self.__setitem__(attr, value)
+    
+    def __delattr__(self, attr: Hashable) -> None:
+        return self.__delitem__(attr)
+
 
 def agg(*args):
     """Aggregate args by addition (a + b)"""

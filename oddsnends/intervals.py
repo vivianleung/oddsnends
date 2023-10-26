@@ -4,7 +4,7 @@ from __future__ import annotations
 import itertools
 import sys
 from collections.abc import Callable, Collection, Hashable
-from typing import Annotated, Union
+from typing import Annotated
 
 import pandas as pd
 
@@ -18,7 +18,7 @@ all = [
 
 ]
 
-ClosedIntervalType = Annotated[Union[str, bool, NoneType],
+ClosedIntervalType = Annotated[str | bool | None,
                                "lower", "left",
                                "upper", "right",
                                "both", True,
@@ -85,9 +85,9 @@ def calc_intervals(*locs: Collection[int],
     return intervals
 
 
-def intervals2locs(intervals: Union[pd.DataFrame, Collection[TwoTupleInts]],
-                col_from: str = None,
-                col_to: str = None,
+def intervals2locs(intervals: pd.DataFrame | Collection[TwoTupleInts],
+                col_from: str = "POS",
+                col_to: str = "END_POS",
                 name: str = "loc",
                 closed: ClosedIntervalType = 'lower',
                 indexing: Annotated[int, 0, 1] = 0,
@@ -161,8 +161,8 @@ def intervals2locs(intervals: Union[pd.DataFrame, Collection[TwoTupleInts]],
 
 
 
-def setops_ranges(interval_1: Union[pd.DataFrame, Collection[TwoTupleInts]],
-                  interval_2: Union[pd.DataFrame, Collection[TwoTupleInts]],
+def setops_ranges(interval_1: pd.DataFrame | Collection[TwoTupleInts],
+                  interval_2: pd.DataFrame | Collection[TwoTupleInts],
                   col_from: str = "start",
                   col_to: str = "end",
                   how: Annotated[str, "right_only", "left_only", "both"] = "both",
@@ -236,7 +236,7 @@ def shift_interval(closed_from: ClosedIntervalType,
                    index_to: Annotated[int, 0, 1] = None,
                    left: int = None,
                    right: int = None,
-                   ) -> Union[TwoTupleInts, tuple[TwoTupleInts, TwoTupleInts]]:
+                   ) -> TwoTupleInts | tuple[TwoTupleInts, TwoTupleInts]:
     
     match closed_from:  # shift from this to left closed, right open
         case "right" | "upper":     # left 

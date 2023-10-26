@@ -3,28 +3,35 @@
 # pandas tools
 from __future__ import annotations
 import logging
-from collections.abc import Collection, Hashable, MutableSequence
-from typing import Annotated, Any, Generic, TypeVar, Union
+from collections.abc import Hashable, MutableSequence, Sequence
+from typing import Annotated, TypeVar, Union
 
 import numpy as np
 import pandas as pd
-
+from pandas.core.generic import NDFrame
 from oddsnends.main import default
 
 
 __all__ = ["SeriesType",
+           "assign",
            "check_if_exists",
+           "conv_alias",
            "pipe_concat",
            "get_level_uniques",
            "pivot_indexed_table",
            "reorder_cols",
            "sort_levels",
+           "swap_index",
            ]
 
 
 SeriesType = TypeVar("SeriesType")
 
-        
+def assign(ser: pd.Series, **kwargs) -> pd.DataFrame:
+    """Wrapper for assigning values to series and converting to DataFrame"""
+    return ser.to_frame().assign(**kwargs)
+    
+
 def check_if_exists(labels: list, index: pd.Index,
                     errors: Annotated[str, 'ignore', 'warn', 'raise'] = 'ignore'
                     ) -> list:
@@ -49,8 +56,59 @@ def check_if_exists(labels: list, index: pd.Index,
     
     return np.array(labels)[which_labels]
 
-def get_level_uniques(df: Union[pd.MultiIndex, pd.Series, pd.DataFrame],
-                      name: str, axis: Union[int, str] = 0) -> pd.Index:
+
+def conv_alias(gts: pd.DataFrame,
+               value: Hashable,
+               id_col: Hashable,
+               columns: Hashable | Sequence[Hashable],
+               alias_name: str = "ALIAS"
+               ) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
+    """Convolutes/deduplicates entries (by 'id_col') with identical values
+    
+    Returns 
+    - pd.Series: id_xref with index ID_COL and values ALIAS
+    - pd.DataFrame: alias_xref with index ALIAS, columns COLUMNS, values value
+    - pd.DataFrame: aliased gts with columns [*COLUMNS, ALIAS, value]
+    """
+    if len(gts) == 0:
+        id_xref = pd.Series(name=alias_name).rename_axis(id_col)
+        alias_xref = pd.DataFrame(columns=columns).rename_axis(alias_name)
+        aliased = pd.DataFrame(columns=[*columns, alias_name, value])
+    
+    else:
+        pivoted = gts.reset_index().pivot_table(
+            value, id_col, columns, aggfunc=lambda x: x)
+
+        id_col_idx = pivoted.columns
+        groups = pivoted.reset_index().groupby(id_col_idx.to_list())
+
+
+        id_xref = {}
+        alias_xref = {}
+        
+        for i, (key, group) in enumerate(groups[id_col]):
+            alias_xref[i] = key
+            id_xref[i] = group
+            
+        id_xref = pd.concat(
+            id_xref, names=[alias_name]).droplevel(-1).pipe(swap_index)
+
+        alias_xref = (
+            pd.DataFrame.from_dict(alias_xref, "index", columns=id_col_idx)
+            .rename_axis([alias_name])
+        )
+        aliased = (
+            alias_xref.melt(value_name=value, ignore_index=False)
+            .reset_index()
+            .pipe(reorder_cols, last=alias_name)
+        )
+
+    return id_xref, alias_xref, aliased
+
+
+
+def get_level_uniques(df: pd.MultiIndex | NDFrame,
+                      name: str, axis: int | str = 0) -> pd.Index:
     """Faster way of getting unique values from an index level"""
 
     if isinstance(df, pd.MultiIndex):
@@ -71,7 +129,7 @@ def get_level_uniques(df: Union[pd.MultiIndex, pd.Series, pd.DataFrame],
     return index.levels[level[0]].values
 
 
-def pipe_concat(*objs: Union[pd.Series, pd.DataFrame], **kws):
+def pipe_concat(*objs: NDFrame, **kws):
     """A pipe-able way to concat"""
     return pd.concat(objs, **kws)
 
@@ -99,13 +157,13 @@ def pivot_indexed_table(df: pd.DataFrame, *args, **kwargs) -> pd.DataFrame:
 
 
 def reorder_cols(df: pd.DataFrame,
-                 first: Union[Hashable, Collection[Hashable], pd.Index] = None,
-                 last: Union[Hashable, Collection[Hashable], pd.Index] = None,
+                 first: Hashable | Sequence[Hashable] | pd.Index | None = None,
+                 last: Hashable | Sequence[Hashable] | pd.Index | None = None,
                  inplace: bool = False,
                  ascending: bool = None,
                  sort_kws: dict = None,
                  errors: Annotated[str, 'ignore', 'warn', 'raise'] = 'ignore',
-                 ) -> Union[pd.DataFrame, None]:
+                 ) -> pd.DataFrame | None:
     """Reorders columns of dataframe.
 
     Arguments:
@@ -169,9 +227,8 @@ def reorder_cols(df: pd.DataFrame,
     
     
     
-def sort_levels(df: Union[pd.Series, pd.DataFrame, pd.MultiIndex],
-                axis: int = 0, **sort_kws
-                ) -> Union[pd.Series, pd.DataFrame, pd.MultiIndex]:
+def sort_levels(df: NDFrame | pd.MultiIndex, axis: int = 0, **sort_kws
+                ) -> NDFrame | pd.MultiIndex:
     """Sort index or column levels of a MultiIndex (in a Series or DataFrame)
 
     axis: sort index (0) or column(1) levels (if DataFrame is passed)
@@ -202,3 +259,55 @@ def sort_levels(df: Union[pd.Series, pd.DataFrame, pd.MultiIndex],
     else:
         return df.reorder_levels(sorted_index)
     
+
+
+def swap_index(frame: NDFrame, keys: Hashable | Sequence[Hashable] = None,
+               inplace: bool = False, **kws) -> NDFrame | None:
+    """Swaps a column in for an index without dropping the reset index
+    
+    frame: pd.Series or pd.DataFrame
+    keys:  keys or list of keys
+        Column name(s) to set as new index
+    
+    """
+    def _swap_index(_frame, _keys, **_kws):
+        return _frame.reset_index(**_kws).set_index(_keys)
+
+    def _get_set_names(_frame_names, _fmt: str = "index_{}"):
+        return [default(
+            name, _fmt.format(i)) for i, name in enumerate(_frame_names)]
+    
+    # set reset index names
+    names = kws.pop("names", _get_set_names(frame.index.names))
+    
+    if keys is not None:
+        pass
+    elif isinstance(frame, pd.DataFrame):
+        keys = frame.columns.to_list()
+    else:
+        keys = frame.name
+        
+    match frame:
+        case pd.DataFrame() if inplace:
+            frame.reset_index(inplace=inplace, names=names, **kws)
+            frame.set_index(keys, inplace=inplace)
+            
+        case pd.DataFrame():
+            return _swap_index(frame, keys, names=names, **kws)
+        
+        case pd.Series() if inplace:
+            frame.rename_axis(names, inplace=True)
+            swapped = _swap_index(frame, keys, *kws).squeeze(axis=1)
+            frame.rename(frame, inplace=True)
+            frame.replace(swapped, inplace=True)
+            # swap names
+            frame.rename_axis(swapped.index.names, inplace=True)
+            frame.rename(swapped.name, inplace=True)
+        
+        case pd.Series():
+            return frame.rename_axis(names).pipe(
+                _swap_index, keys, *kws).squeeze(axis=1)
+            
+        case _:
+            raise TypeError("Bad 'frame' type", type(frame))
+
