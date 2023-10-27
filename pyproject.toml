@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "oddsnends"
 
-version = "0.1.1dev4"
+version = "0.1.2"
 
 authors = [
   { name="Vivian Leung", email="leung.vivian.w@gmail.com" },
@@ -29,6 +29,8 @@ dependencies = [
   "pandas>=2.1",
   "regex",
 ]
+
+dynamic = ["license"]
 
 keywords = ["oddsnends"]
 
