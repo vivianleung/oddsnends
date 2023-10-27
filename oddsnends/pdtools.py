@@ -15,7 +15,7 @@ from oddsnends.main import default
 __all__ = ["SeriesType",
            "assign",
            "check_if_exists",
-           "conv_alias",
+           "dedup_alias",
            "pipe_concat",
            "get_level_uniques",
            "pivot_indexed_table",
@@ -57,53 +57,58 @@ def check_if_exists(labels: list, index: pd.Index,
     return np.array(labels)[which_labels]
 
 
-def conv_alias(gts: pd.DataFrame,
-               value: Hashable,
-               id_col: Hashable,
-               columns: Hashable | Sequence[Hashable],
-               alias_name: str = "ALIAS"
-               ) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
-    """Convolutes/deduplicates entries (by 'id_col') with identical values
+def dedup_alias(data: pd.DataFrame,
+                value: Hashable,
+                id_col: Hashable,
+                columns: Hashable | Sequence[Hashable],
+                alias_name: str = "ALIAS"
+                # ) -> tuple[pd.DataFrame, pd.DataFrame]:
+                ) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
+    """Deduplicates and aliases entries (by 'id_col') with identical values
     
     Returns 
     - pd.Series: id_xref with index ID_COL and values ALIAS
     - pd.DataFrame: alias_xref with index ALIAS, columns COLUMNS, values value
-    - pd.DataFrame: aliased gts with columns [*COLUMNS, ALIAS, value]
+    - pd.DataFrame: aliased values with columns [*COLUMNS, ALIAS, value]
     """
-    if len(gts) == 0:
+    # - pd.DataFrame: alias xrefs with ["KEY", id_col, N_id_col]
+    if len(data) == 0:
         id_xref = pd.Series(name=alias_name).rename_axis(id_col)
         alias_xref = pd.DataFrame(columns=columns).rename_axis(alias_name)
+        
+        xrefs = pd.DataFrame(columns=["KEY", id_col, f"N_{id_col}"])
         aliased = pd.DataFrame(columns=[*columns, alias_name, value])
     
     else:
-        pivoted = gts.reset_index().pivot_table(
+        pivoted = data.reset_index().pivot_table(
             value, id_col, columns, aggfunc=lambda x: x)
 
         id_col_idx = pivoted.columns
         groups = pivoted.reset_index().groupby(id_col_idx.to_list())
 
-
-        id_xref = {}
-        alias_xref = {}
-        
-        for i, (key, group) in enumerate(groups[id_col]):
-            alias_xref[i] = key
-            id_xref[i] = group
-            
-        id_xref = pd.concat(
-            id_xref, names=[alias_name]).droplevel(-1).pipe(swap_index)
-
-        alias_xref = (
-            pd.DataFrame.from_dict(alias_xref, "index", columns=id_col_idx)
-            .rename_axis([alias_name])
+        xrefs = (
+            pd.DataFrame(list(groups[id_col]), columns=["KEY", id_col])
+            .assign(**{f"N_{id_col}": lambda df: df[id_col].apply(len)})
+            .sort_values([f"N_{id_col}", "KEY"], ascending=[False, True],
+                         ignore_index=True)
+            .rename_axis(alias_name)
         )
+        
+        id_xref = xrefs[id_col].explode().pipe(swap_index)
+        
+        alias_xref = pd.DataFrame.from_records(
+            xrefs["KEY"], columns=id_col_idx).rename_axis(alias_name)
+        
         aliased = (
-            alias_xref.melt(value_name=value, ignore_index=False)
+            pd.DataFrame
+            .from_records(xrefs["KEY"], columns=id_col_idx)
+            .rename_axis(alias_name)
+            .melt(value_name=value, ignore_index=False)
             .reset_index()
             .pipe(reorder_cols, last=alias_name)
         )
-
-    return id_xref, alias_xref, aliased
+    return id_xref, alias_xref, xrefs, aliased
+    # return xrefs, aliased
 
 
 
