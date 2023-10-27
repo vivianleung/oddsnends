@@ -26,7 +26,61 @@ Miscellaneous data science methods
 Features
 --------
 
-* TODO
+Classes
+-------
+* AttrDict
+
+Types
+-----
+* ClosedIntervalType
+* LoggingLevels
+* NoneType
+* Numeric
+* SeriesType
+* TwoTupleInts
+
+Methods
+-------
+
+General:
+* default
+* defaults
+* is_null
+* msg
+* now
+* parse_literal_eval
+
+
+for collections:
+* agg
+* dict2list
+* drop_duplicates
+* dropna
+* pops
+* simplify
+* strictcollection
+
+For intervals:
+* calc_intervals
+* intervals2locs
+* setops_ranges
+
+Math:
+* rounding
+* ceiling
+* floor
+
+pandas tools:
+* assign
+* check_if_exists
+* dedup_alias
+* pipe_concat
+* get_level_uniques
+* pivot_indexed_table
+* reorder_cols
+* sort_levels
+* swap_index
+
 
 Credits
 -------

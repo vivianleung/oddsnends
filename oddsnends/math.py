@@ -1,6 +1,11 @@
 # utils/math.py
 
-__all__ = ["Numeric", "rounding", "ceiling", "floor"]
+__all__ = [
+    "Numeric",
+    "rounding",
+    "ceiling",
+    "floor",
+    ]
 
 # Math utilities
 import math
