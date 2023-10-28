@@ -14,7 +14,7 @@ authors = [
 
 description = "Miscellaneous (odds 'n ends) methods for data science"
 
-readme = "README.md"
+readme = "README.rst"
 
 requires-python = ">=3.10"
 

@@ -73,8 +73,6 @@ def dedup_alias(data: pd.DataFrame,
     """
     # - pd.DataFrame: alias xrefs with ["KEY", id_col, N_id_col]
     if len(data) == 0:
-        id_xref = pd.Series(name=alias_name).rename_axis(id_col)
-        alias_xref = pd.DataFrame(columns=columns).rename_axis(alias_name)
         
         xrefs = pd.DataFrame(columns=["KEY", id_col, f"N_{id_col}"])
         aliased = pd.DataFrame(columns=[*columns, alias_name, value])
@@ -93,12 +91,7 @@ def dedup_alias(data: pd.DataFrame,
                          ignore_index=True)
             .rename_axis(alias_name)
         )
-        
-        id_xref = xrefs[id_col].explode().pipe(swap_index)
-        
-        alias_xref = pd.DataFrame.from_records(
-            xrefs["KEY"], columns=id_col_idx).rename_axis(alias_name)
-        
+                
         aliased = (
             pd.DataFrame
             .from_records(xrefs["KEY"], columns=id_col_idx)
@@ -107,7 +100,7 @@ def dedup_alias(data: pd.DataFrame,
             .reset_index()
             .pipe(reorder_cols, last=alias_name)
         )
-    return id_xref, alias_xref, xrefs, aliased
+    return xrefs, aliased
     # return xrefs, aliased
 
 

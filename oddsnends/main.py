@@ -5,6 +5,7 @@
 from __future__ import annotations
 import ast
 import datetime
+import os
 import sys
 import itertools
 from collections.abc import Callable, Collection, Hashable, Iterable
@@ -15,26 +16,19 @@ from numpy import nan
 from pandas.core.generic import NDFrame
 
 __all__ = [
-    "LoggingLevels",
     "NoneType",
     "TwoTupleInts",
     "default",
     "defaults",
-    "is_null",
+    "isnull",
+    "notnull",
     "msg",
     "now",
     "parse_literal_eval",
+    "xor",
 ]
 
 
-LoggingLevels = {
-    "NOTSET": 0,
-    "DEBUG": 10,
-    "INFO": 20,
-    "WARNING": 30,
-    "ERROR": 40,
-    "CRITICAL": 50,
-}
 NoneType = type(None)
 TwoTupleInts = tuple[int, int]
 
@@ -92,32 +86,42 @@ def default(x: Any, default_value: Any = None,
         return has_value
 
 
-def _is_null(x: Any,
-             null_values: Collection[Any],
-             empty: bool = True,
-             do_raise: bool = False) -> bool:
+def _isnull(x: Any,
+            null_values: Collection[Any] = None,
+            empty: bool = True,
+            do_raise: bool = False) -> bool:
+    """Default null_values is [None, nan]"""
+    
+    if null_values is None:
+        null_values = [None, nan]
+    
     try:
         if hasattr(x, "__len__") and empty:
             assert len(x) > 0
         
-        try:
-            assert x not in null_values  # "nan is nan" returns True but nan != nan
-        except ValueError:  # raised when comparing pd.NDFrames like this
-            pass
+        if isinstance(x, NDFrame):
+            raise ValueError("Cannot check values in NDFrames", x)
         
-        for n in null_values:
-            assert x != n
-    
+        for n in null_values:   # "nan is nan" returns True but nan != nan
+            assert (x != n) and (x is not n)
     
     except AssertionError as error:
         if do_raise:
             raise error
-        return False
+        return True
 
-    return True
+    return False
 
-is_null = _is_null
+def _notnull(x: Any,
+             null_values: Collection[Any] = None,
+             empty: bool = True,
+             do_raise: bool = False) -> bool:
+    """Wrapper for _isnull"""
+    return not _isnull(
+        x, null_values=null_values, empty=empty, do_raise=do_raise)
 
+isnull = _isnull
+notnull = _notnull
 
 def defaults(value: Any, *default_values, **kwargs) -> Any:
     """Returns value (via. has value) or first non-null default value
@@ -158,11 +162,11 @@ def defaults(value: Any, *default_values, **kwargs) -> Any:
 
     # check if x is null
     try:
-        is_null = _is_null(value, null_values, empty=empty, do_raise=True)
+        isnull = _isnull(value, null_values, empty=empty, do_raise=True)
         
         i = 0
-        while is_null:
-            is_null = _is_null(default_values[i], null_values, empty=empty)
+        while isnull:
+            isnull = _isnull(default_values[i], null_values, empty=empty)
             i += 1
         return default_values[i]
     
@@ -206,4 +210,7 @@ def parse_literal_eval(val: str) -> Any:
 
 
 
-
+def xor(expr1, expr2):
+    if isinstance(expr1, NDFrame) or isinstance(expr2, NDFrame):
+        return (expr1 | expr2) & ~(expr1 & expr2)
+    return (expr1 or expr2) and not (expr1 and expr2)
