@@ -27,69 +27,69 @@ Features
 
 Classes
 -------
-* AttrDict
+* ``AttrDict``
 
 Types
 -----
-* ClosedIntervalType
-* LoggingLevels
-* NoneType
-* Numeric
-* SeriesType
-* TwoTupleInts
+* ``ClosedIntervalType``
+* ``LoggingLevels``
+* ``NoneType``
+* ``Numeric``
+* ``SeriesType``
+* ``TwoTupleInts``
 
 Methods
 -------
 
 General
 
-* `default`
-* `defaults`
-* `is_null`
-* `msg`
-* `now`
-* `parse_literal_eval`
+* ``default``
+* ``defaults``
+* ``is_null``
+* ``msg``
+* ``now``
+* ``parse_literal_eval``
 
 
 For collections
 
-* `agg`
-* `dict2list`
-* `drop_duplicates`
-* `dropna`
-* `pops`
-* `simplify`
-* `strictcollection`
+* ``agg``
+* ``dict2list``
+* ``drop_duplicates``
+* ``dropna``
+* ``pops``
+* ``simplify``
+* ``strictcollection``
 
 For intervals
 
-* `calc_intervals`
-* `intervals2locs`
-* `setops_ranges`
+* ``calc_intervals``
+* ``intervals2locs``
+* ``setops_ranges``
 
 Math
 
-* `rounding`
-* `ceiling`
-* `floor`
+* ``rounding``
+* ``ceiling``
+* ``floor``
 
 pandas tools
 
-* `assign`
-* `check_if_exists`
-* `dedup_alias`
-* `pipe_concat`
-* `get_level_uniques`
-* `pivot_indexed_table`
-* `reorder_cols`
-* `sort_levels`
-* `swap_index`
+* ``assign``
+* ``check_if_exists``
+* ``dedup_alias``
+* ``pipe_concat``
+* ``get_level_uniques``
+* ``pivot_indexed_table``
+* ``reorder_cols``
+* ``sort_levels``
+* ``swap_index``
 
 
 .. Credits
 .. =======
 
-.. This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
+.. This package was created with Cookiecutter_ and the ``audreyr/cookiecutter-pypackage``_ project template.
 
 .. .. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+.. .. _``audreyr/cookiecutter-pypackage``: https://github.com/audreyr/cookiecutter-pypackage
