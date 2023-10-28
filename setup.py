@@ -4,7 +4,7 @@
 
 from setuptools import setup, find_packages
 
-version = '0.1.1dev4'
+version = '0.1.3a1'
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -36,6 +36,7 @@ setup(
     install_requires=requirements,
     license="MIT License",
     long_description=readme + '\n\n' + history,
+    long_description_content_type="text/x-rst",
     include_package_data=True,
     keywords='oddsnends',
     name='oddsnends',

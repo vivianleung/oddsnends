@@ -15,7 +15,6 @@ Odds and Ends
 
 
 
-
 Miscellaneous data science methods
 
 
@@ -24,14 +23,73 @@ Miscellaneous data science methods
 
 
 Features
---------
+========
 
-* TODO
+Classes
+-------
+* ``AttrDict``
 
-Credits
+Types
+-----
+* ``ClosedIntervalType``
+* ``LoggingLevels``
+* ``NoneType``
+* ``Numeric``
+* ``SeriesType``
+* ``TwoTupleInts``
+
+Methods
 -------
 
-This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
+General
 
-.. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+* ``default``
+* ``defaults``
+* ``is_null``
+* ``msg``
+* ``now``
+* ``parse_literal_eval``
+
+
+For collections
+
+* ``agg``
+* ``dict2list``
+* ``drop_duplicates``
+* ``dropna``
+* ``pops``
+* ``simplify``
+* ``strictcollection``
+
+For intervals
+
+* ``calc_intervals``
+* ``intervals2locs``
+* ``setops_ranges``
+
+Math
+
+* ``rounding``
+* ``ceiling``
+* ``floor``
+
+pandas tools
+
+* ``assign``
+* ``check_if_exists``
+* ``dedup_alias``
+* ``pipe_concat``
+* ``get_level_uniques``
+* ``pivot_indexed_table``
+* ``reorder_cols``
+* ``sort_levels``
+* ``swap_index``
+
+
+.. Credits
+.. =======
+
+.. This package was created with Cookiecutter_ and the ``audreyr/cookiecutter-pypackage``_ project template.
+
+.. .. _Cookiecutter: https://github.com/audreyr/cookiecutter
+.. .. _``audreyr/cookiecutter-pypackage``: https://github.com/audreyr/cookiecutter-pypackage
