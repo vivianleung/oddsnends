@@ -1,10 +1,12 @@
 """ioa.py"""
 
 # Input, output and args-related
+import gzip
 import os
+import pickle
 from argparse import ArgumentParser
 from colllections.abc import Callable, Generator
-from typing import Annotated
+from typing import Annotated, Any
 
 __all__ = [
     "LoggingLevels",
@@ -12,6 +14,7 @@ __all__ = [
     "assertexists",
     "filepath",
     "find_fpaths",
+    "read_pkl_gz",
 ]
 
 LoggingLevels = {
@@ -121,7 +124,7 @@ def find_fpaths(
     )
 
 
-def read_pkl_gz(fpath: str):
+def read_pkl_gz(fpath: str) -> Any:
     """Read in data from a gzipped pickle"""
     with gzip.open(fpath, "rb") as fin:
         return pickle.load(fin)
