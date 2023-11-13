@@ -5,7 +5,7 @@ import gzip
 import os
 import pickle
 from argparse import ArgumentParser
-from colllections.abc import Callable, Generator
+from collections.abc import Callable, Generator
 from typing import Annotated, Any
 
 __all__ = [
