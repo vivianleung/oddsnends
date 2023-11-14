@@ -1,10 +1,10 @@
-# pdtools.py
+"""pdtools.py"""
 
 # pandas tools
 from __future__ import annotations
 import logging
-from collections.abc import Callable, Hashable, MutableSequence, Sequence
-from typing import Annotated, TypeVar, Union
+from collections.abc import Hashable, MutableSequence, Sequence
+from typing import Annotated, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -20,6 +20,7 @@ __all__ = [
     "group_identical_rows",
     "pipe_concat",
     "get_level_uniques",
+    "ordered_fillna",
     "pivot_indexed_table",
     "reorder_cols",
     "sort_levels",
@@ -86,7 +87,7 @@ def group_identical_rows(
     rank_ascending: bool = None,
     force_lists: bool = False,
     **sort_kws,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Generates a dataframe of unique rows and lists of indices corresponding
     to groups of identical rows and each group assigned a unique alias
 
@@ -98,9 +99,10 @@ def group_identical_rows(
         Name of the output alias column
     alias_prefix : str
         Prefix for aliases. If None, no prefix is added. Defaults to None
-    rank_ascending: bool or None
+    rank_ascending: bool or Noned
         After sorting index, rank unique entries by popularity (most common) in
-        descending (rank_sort first) or ascending (rank_sort last) order, or don't do (None), by default None.
+        descending (rank_sort first) or ascending (rank_sort last) order, or
+        don't do (None), by default None.
     force_lists : bool, optional
         Whether the grouped `data` indices should be forced to be lists. If set
         to True, single-member groups will also be represented as lists.
@@ -114,33 +116,36 @@ def group_identical_rows(
     pd.DataFrame
         Cross-ref with index as aliases, values as (lists of) `data` indices
     """
-    
+
     # group rows via. pivot_table. faster than groupby
     pivoted = (
         data.reset_index()
         .pivot_table(data.index.names, data.columns.to_list(), aggfunc=lambda x: x)
         .sort_index(**sort_kws)
     )
-    
+
     # rank sort in place
     if isinstance(rank_ascending, bool):
+        # check if value is actually a list
+        pivoted.insert(
+            0,
+            "_nrows",
+            pivoted[data.index.names[0]].apply(
+                lambda x: len(x) if isinstance(x, list) else 1
+            ),
+        )
 
-        # check if value is actually a list        
-        pivoted.insert(0, "_nrows", pivoted[data.index.names[0]].apply(
-            lambda x: len(x) if isinstance(x, list) else 1))
-        
         # sort by rank
         pivoted.sort_values("_nrows", ascending=rank_ascending)
         pivoted.drop("_nrows", axis=1, inplace=True)
-    
+
     elif rank_ascending is not None:
         raise ValueError("Bad value for 'rank_ascending'", rank_ascending)
-
 
     # assign alias (with prefix)
     if alias_prefix is None:
         pivoted[alias_name] = range(len(pivoted))
-    
+
     else:
         pad = len(str(len(pivoted)))
         formatter = f"{alias_prefix}{{0:0{pad}d}}".format
@@ -171,52 +176,6 @@ def group_identical_rows(
     xref = pivoted.set_index(alias_name)  # also drops the 'rows' index levels
 
     return dedup, xref
-
-
-def dedup_alias(
-    data: pd.DataFrame,
-    value: Hashable,
-    id_col: Hashable,
-    columns: Hashable | Sequence[Hashable],
-    alias_name: str = "ALIAS",
-) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
-    """Deduplicates and aliases entries (by 'id_col') with identical values
-    Returns
-    - pd.Series: id_xref with index ID_COL and values ALIAS
-    - pd.DataFrame: alias_xref with index ALIAS, columns COLUMNS, values value
-    - pd.DataFrame: aliased values with columns [*COLUMNS, ALIAS, value]
-    """
-    # - pd.DataFrame: alias xrefs with ["KEY", id_col, N_id_col]
-    if len(data) == 0:
-        xrefs = pd.DataFrame(columns=["KEY", id_col, f"N_{id_col}"])
-        aliased = pd.DataFrame(columns=[*columns, alias_name, value])
-
-    else:
-        pivoted = data.reset_index().pivot_table(
-            value, id_col, columns, aggfunc=lambda x: x
-        )
-
-        id_col_idx = pivoted.columns
-        groups = pivoted.reset_index().groupby(id_col_idx.to_list())
-
-        xrefs = (
-            pd.DataFrame(list(groups[id_col]), columns=["KEY", id_col])
-            .assign(**{f"N_{id_col}": lambda df: df[id_col].apply(len)})
-            .sort_values(
-                [f"N_{id_col}", "KEY"], ascending=[False, True], ignore_index=True
-            )
-            .rename_axis(alias_name)
-        )
-
-        aliased = (
-            pd.DataFrame.from_records(xrefs["KEY"], columns=id_col_idx)
-            .rename_axis(alias_name)
-            .melt(value_name=value, ignore_index=False)
-            .reset_index()
-            .pipe(reorder_cols, last=alias_name)
-        )
-    return xrefs, aliased
-    # return xrefs, aliased
 
 
 def dedup_alias(
@@ -290,6 +249,44 @@ def get_level_uniques(
     return index.levels[level[0]].values
 
 
+def ordered_fillna(
+    df: pd.DataFrame,
+    label: Hashable,
+    order: Hashable | Sequence[Hashable],
+    inplace: bool = True,
+) -> pd.DataFrame | None:
+    """Progressive fillna according to an ordered `order` list
+
+    gff3: pd.DataFrame
+        DataFrame must contain columns in `order`
+    label:  Hashable
+        Column label to fill, either existing or new. Default "name"
+    order : Hashable or sequence of Hashables
+        Field or ordered list of fields by which to populate the column
+    inplace: bool, optional
+        Do inplace
+
+    Returns:
+    pd.DataFrame or None
+    """
+    # get order priority
+    if isinstance(order, Hashable):
+        order = [order]
+
+    if not inplace:
+        df = df.copy()
+
+    # set 'name' field
+    if label not in df:
+        df[label] = df[order[0]]
+
+    for field in order:
+        df[label].fillna(field, inplace=True)
+
+    if not inplace:
+        return df
+
+
 def pipe_concat(*objs: NDFrame, **kws):
     """A pipe-able way to concat"""
     return pd.concat(objs, **kws)
@@ -333,7 +330,8 @@ def reorder_cols(
         last: column label, list of labels or pd.Index to put last
         inplace: bool, default False
         ascending: bool, default None
-            how to sort remaining columns, where True is ascending, False is descending, and None is not sorted
+            how to sort remaining columns, where True is ascending, False is
+            descending, and None is not sorted
         sort_kws: dict, default None
             kwargs to pass to pd.DataFrame.sort_index() func
 

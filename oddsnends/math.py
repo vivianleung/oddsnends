@@ -1,4 +1,4 @@
-# utils/math.py
+"""math.py"""
 
 __all__ = [
     "Numeric",

@@ -1,23 +1,18 @@
-# utils.py
+"""main.py"""
 
 # General utilities
 
 from __future__ import annotations
 import ast
 import datetime
-import os
 import sys
-import itertools
-from collections.abc import Callable, Collection, Hashable, Iterable
-from typing import Any, Annotated, Union
+from collections.abc import Callable, Collection, Hashable, Sequence
+from typing import Annotated, Any
 
-import pandas as pd
 from numpy import nan
 from pandas.core.generic import NDFrame
 
 __all__ = [
-    "NoneType",
-    "TwoTupleInts",
     "default",
     "defaults",
     "isnull",
@@ -29,16 +24,33 @@ __all__ = [
 ]
 
 
-NoneType = type(None)
-TwoTupleInts = tuple[int, int]
+class OptionsMetaType(type):
+    """Metaclass"""
+
+    options: list
+
+    def __repr__(cls):
+        bases = " | ".join((getattr(x, "__name__", str(x)) for x in cls.bases))
+        options = ", ".join(
+            (f"'{x}'" if isinstance(x, str) else str(x) for x in cls.options)
+        )
+        return f"{cls.__name__}[{bases}, {options}]"
+
+    def __instancecheck__(cls, instance):
+        return instance in cls.options
+
+    def __new__(mcs, name: str, bases: tuple, attrs: dict):
+        return super().__new__(mcs, name, bases, attrs)
 
 
-
-def default(x: Any, default_value: Any = None,
-            has_value: Any = lambda x: x,
-            null_values: Annotated[Any | Collection[Any] | str, 'null'] = None,
-            func_args: Collection = None,
-            func_kws: dict = None):
+def default(
+    x: Any,
+    default_value: Any = None,
+    has_value: Any = lambda x: x,
+    null_values: Annotated[Any | Collection[Any] | str, "null"] = None,
+    func_args: Collection = None,
+    func_kws: dict = None,
+):
     """General function for checking/returning null/non-null objects.
 
     Arguments:
@@ -60,8 +72,8 @@ def default(x: Any, default_value: Any = None,
 
     none_objs = [None, nan]
     try:
-        if null_values == 'null':
-            if hasattr(x, '__len__'):
+        if null_values == "null":
+            if hasattr(x, "__len__"):
                 assert len(x) > 0
             assert x not in none_objs
         else:
@@ -86,25 +98,27 @@ def default(x: Any, default_value: Any = None,
         return has_value
 
 
-def _isnull(x: Any,
-            null_values: Collection[Any] = None,
-            empty: bool = True,
-            do_raise: bool = False) -> bool:
+def _isnull(
+    x: Any,
+    null_values: Collection[Any] = None,
+    empty: bool = True,
+    do_raise: bool = False,
+) -> bool:
     """Default null_values is [None, nan]"""
-    
+
     if null_values is None:
         null_values = [None, nan]
-    
+
     try:
         if hasattr(x, "__len__") and empty:
             assert len(x) > 0
-        
+
         if isinstance(x, NDFrame):
             raise ValueError("Cannot check values in NDFrames", x)
-        
-        for n in null_values:   # "nan is nan" returns True but nan != nan
+
+        for n in null_values:  # "nan is nan" returns True but nan != nan
             assert (x != n) and (x is not n)
-    
+
     except AssertionError as error:
         if do_raise:
             raise error
@@ -112,16 +126,20 @@ def _isnull(x: Any,
 
     return False
 
-def _notnull(x: Any,
-             null_values: Collection[Any] = None,
-             empty: bool = True,
-             do_raise: bool = False) -> bool:
+
+def _notnull(
+    x: Any,
+    null_values: Collection[Any] = None,
+    empty: bool = True,
+    do_raise: bool = False,
+) -> bool:
     """Wrapper for _isnull"""
-    return not _isnull(
-        x, null_values=null_values, empty=empty, do_raise=do_raise)
+    return not _isnull(x, null_values=null_values, empty=empty, do_raise=do_raise)
+
 
 isnull = _isnull
 notnull = _notnull
+
 
 def defaults(value: Any, *default_values, **kwargs) -> Any:
     """Returns value (via. has value) or first non-null default value
@@ -157,37 +175,37 @@ def defaults(value: Any, *default_values, **kwargs) -> Any:
     null_values = kwargs.get("null_values", [None, nan])
     if isinstance(null_values, Hashable):
         null_values = [null_values]
-        
+
     empty = kwargs.get("empty", True)
 
     # check if x is null
     try:
         isnull = _isnull(value, null_values, empty=empty, do_raise=True)
-        
+
         i = 0
         while isnull:
             isnull = _isnull(default_values[i], null_values, empty=empty)
             i += 1
         return default_values[i]
-    
+
     except AssertionError:
         # x is not null, so return has_value
         try:
             has_value = kwargs["has_value"]
             assert callable(has_value), has_value
-            
+
         except KeyError:  # just return x
-            return value                 
-        
+            return value
+
         except AssertionError as error:  # return the fixed value
             return error.args[0]
 
         return has_value(
-            value, *kwargs.get("func_args", []), **kwargs.get("func_kws", {}))
-            
+            value, *kwargs.get("func_args", []), **kwargs.get("func_kws", {})
+        )
+
     except IndexError:  # x and all default values are null
         return default_values[-1]
-    
 
 
 def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:
@@ -196,7 +214,8 @@ def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:
     if flush:
         stream.flush()
 
-def now(fmt: str = '%c') -> str:
+
+def now(fmt: str = "%c") -> str:
     """Get and format current datetime"""
     return datetime.datetime.now().strftime(fmt)
 
@@ -209,8 +228,10 @@ def parse_literal_eval(val: str) -> Any:
         return val
 
 
-
-def xor(expr1, expr2):
+def xor(
+    expr1: bool | Sequence[bool], expr2: bool | Sequence[bool]
+) -> bool | Sequence[bool]:
+    """Exclusive or operatory"""
     if isinstance(expr1, NDFrame) or isinstance(expr2, NDFrame):
         return (expr1 | expr2) & ~(expr1 & expr2)
     return (expr1 or expr2) and not (expr1 and expr2)

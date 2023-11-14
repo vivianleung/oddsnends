@@ -1,3 +1,5 @@
+"""__init__.py"""
+
 from .collections import *
 from .intervals import *
 from .ioa import *
