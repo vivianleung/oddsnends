@@ -8,11 +8,11 @@ dependencies:
 - ipykernel
 - ipython
 - jupyter
-- pip
+- pip>=23.3
 - pyright
 - setuptools
 - Sphinx
 - tox
 - twine
 - watchdog
-- wheel
+- wheel>=0.38.1

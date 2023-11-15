@@ -28,6 +28,7 @@ dependencies = [
   "numpy",
   "pandas>=2.1",
   "regex",
+  "pip>=23.3",
 ]
 
 dynamic = ["license"]
