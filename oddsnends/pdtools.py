@@ -253,7 +253,7 @@ def ordered_fillna(
     df: pd.DataFrame,
     label: Hashable,
     order: Hashable | Sequence[Hashable],
-    inplace: bool = True,
+    inplace: bool = False,
 ) -> pd.DataFrame | None:
     """Progressive fillna according to an ordered `order` list
 

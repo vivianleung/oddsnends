@@ -90,7 +90,10 @@ def pops(dct: dict, *keys, **kws) -> list[Any]:
 
 
 def simplify(value: Any) -> Any:
-    """Simplify value to a single value, if collection has only one value"""
+    """Simplify value to a single value, if collection has only one value
+    
+    
+    """
     try:
         assert len(value) != 1, 1
         assert len(value) != 0, 0

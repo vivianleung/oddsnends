@@ -1,12 +1,12 @@
-"""ioa.py"""
+"""Input, output and args-related"""
 
-# Input, output and args-related
 import os
-from argparse import ArgumentParser
+from argparse import ArgumentParser, HelpFormatter
 from typing import Annotated
 
 __all__ = [
     "LoggingLevels",
+    "SmartFormatter",
     "assertfile",
     "assertexists",
     "argtype_filepath",
@@ -20,6 +20,19 @@ LoggingLevels = {
     "ERROR": 40,
     "CRITICAL": 50,
 }
+
+class SmartFormatter(HelpFormatter):
+    """SmartFormatter for parser
+    
+    source: https://stackoverflow.com/a/22157136/3352659
+    """
+    def _split_lines(self, text, width):
+        if text.startswith("R|"):
+            return text[2:].splitlines()
+        # this is the RawTextHelpFormatter._split_lines
+        return HelpFormatter._split_lines(self, text, width)
+
+
 
 def assertfile(fpath: str | None, *err_args,
                null: Annotated[str, "ignore", "raise"] = "ignore") -> None:

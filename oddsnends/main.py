@@ -13,6 +13,7 @@ from numpy import nan
 from pandas.core.generic import NDFrame
 
 __all__ = [
+    "OptionsMetaType",
     "default",
     "defaults",
     "isnull",
@@ -141,17 +142,15 @@ isnull = _isnull
 notnull = _notnull
 
 
-def defaults(value: Any, *default_values, **kwargs) -> Any:
+def defaults(*values: Any, **kwargs) -> Any:
     """Returns value (via. has value) or first non-null default value
 
     Note: can only check if a pd.NDFrame is empty. Cannot check values
 
     Parameters
     ----------
-    value: Any
-        Value to check
-    *default_values: Any
-        Default values to check (in order) and return the first non-null
+    *values: Any
+        Values to check (in order) and return the first non-null
         (or the last value all null). Default returns None.
 
     **kwargs takes:
@@ -169,44 +168,66 @@ def defaults(value: Any, *default_values, **kwargs) -> Any:
     func_kws:   dict
         Kwargs to pass to has_value (if callable)
 
+    Usage:
+    >>> defaults(None, None, 1)
+    1
+    >>> defaults(1, None, nan)
+    1
+    >>> defaults(None, 1, None)
+    1
+    >>> defaults("", 1, empty=True)
+    1
+    >>> defaults("", 1, empty=False)
+    ''
+    >>> defaults("", "foo", "bar", "baz", null_values=[None, nan, "foo"])
+    'bar'
+    >>> defaults("hello", "world")
+    'hello'
+    >>> defaults("hello", "world", has_value=lambda s: f"{s} and good night")
+    'hello and good night'
     """
-
+        
     # figure out what counts as a null value
     null_values = kwargs.get("null_values", [None, nan])
     if isinstance(null_values, Hashable):
         null_values = [null_values]
 
     empty = kwargs.get("empty", True)
-
-    # check if x is null
+    
+    # initialize vars
+    isnull = True  
+    
     try:
-        isnull = _isnull(value, null_values, empty=empty, do_raise=True)
+        val = values[0]
+        
+    except IndexError as error:
+        raise TypeError("Must provide at least one value") from error
+    
+    for val in values:
+        isnull = _isnull(val, null_values, empty=empty, do_raise=False)
+        if not isnull:
+            break
 
-        i = 0
-        while isnull:
-            isnull = _isnull(default_values[i], null_values, empty=empty)
-            i += 1
-        return default_values[i]
-
-    except AssertionError:
-        # x is not null, so return has_value
+    if isnull:  # reached the end
+        return val
+    else:
+        # value is not null, so return has_value
         try:
             has_value = kwargs["has_value"]
             assert callable(has_value), has_value
 
         except KeyError:  # just return x
-            return value
+            return val
 
         except AssertionError as error:  # return the fixed value
             return error.args[0]
 
         return has_value(
-            value, *kwargs.get("func_args", []), **kwargs.get("func_kws", {})
+            val, *kwargs.get("func_args", []), **kwargs.get("func_kws", {})
         )
 
-    except IndexError:  # x and all default values are null
-        return default_values[-1]
 
+#%%
 
 def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:
     """Writes message to stream"""

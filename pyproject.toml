@@ -39,3 +39,6 @@ keywords = ["oddsnends"]
 "Bug Tracker" = "https://github.com/vivianleung/pyvcftools/issues"
 
 
+[tool.pytest]
+addopts = ["--doctest-modules"]
+doctest_optionflags= ["NORMALIZE_WHITESPACE", "ELLIPSIS"]
