@@ -5,8 +5,9 @@ import itertools
 from collections.abc import Callable, Collection, Hashable, Sequence
 from typing import Annotated
 
-import pandas as pd
 
+import numpy as np
+import pandas as pd
 from oddsnends.main import OptionsMetaType, default
 
 __all__ = [
@@ -15,6 +16,7 @@ __all__ = [
     "calc_intervals",
     "intervals2locs",
     "setops_ranges",
+    "shift_interval",
 ]
 
 
@@ -62,13 +64,13 @@ class IntervalType(metaclass=OptionsMetaType):
             return option in ["upper", "right", "closed", "both", True]
 
 
-def calc_intervals(
+def calc_intervals(  
     *locs: Collection[int],
     sort: bool = True,
     sort_key: Callable = None,
     sort_reverse: bool = False,
     interval_type: IntervalType = "lower",
-) -> list[int]:
+) -> list[tuple[int, int]]:
     """Calculate spanning interval ranges given list of values (with sorting)
 
     loc: list-like of ints
@@ -82,13 +84,37 @@ def calc_intervals(
     interval_type: IntervalType, optional
         See help(IntervalType). Default "lower" (native python range system)
     Returns a list of 2-tuples of ints
+    
+    Usage:
+    
+    Basic usage:
+    >>> calc_intervals([1, 2, 3, 4, 5])
+    [(1, 6)]
+    >>> calc_intervals([1, 2, 3, 4, 6, 7])
+    [(1, 5), (6, 8)]
+    
+    Change interval type
+    >>> calc_intervals([1, 2, 3, 4, 6, 7, 9], interval_type="closed")
+    [(1, 4), (6, 7), (9, 9)]
+    
+    >>> calc_intervals([0, 1, 2, 9], interval_type="open")
+    [(-1, 3), (8, 10)]
+    
+    Single element
+    >>> calc_intervals([42], interval_type="closed")
+    [(42, 42)]
+
+    Duplicate elements
+    >>> calc_intervals([0, 1, 1, 2, 9], interval_type="right")
+    [(-1, 2), (8, 9)]
     """
     # Based on https://stackoverflow.com/a/72043030
 
-    # shift bounds by this much,
-    shift_lower, shift_upper = shift_interval(True, interval_type)
+    # shift from closed (members all included) to target interval_type
+    shift_lower, shift_upper = shift_interval("closed", interval_type)
 
     flattened = list(itertools.chain.from_iterable(locs))
+
 
     if sort:
         flattened = sorted(flattened, key=sort_key, reverse=sort_reverse)
@@ -96,18 +122,18 @@ def calc_intervals(
     if len(flattened) == 0:
         return []
 
-    if len(flattened) == 1:
-        return [(flattened[0], flattened[0] + 1)]
-
+    deduped = dict.fromkeys(flattened, 0)
+    
     try:
-        not_int = list(filter(lambda x: not isinstance(x, int), flattened))
+        not_int = list(filter(lambda x: not isinstance(x, int), deduped))
         assert len(not_int) == 0, not_int
+    
     except AssertionError as err:
-        raise ValueError(f"Not int: {not_int}") from err
+        raise ValueError(f"Not an int: {not_int}") from err
 
     intervals = []
     try:
-        for _, g in itertools.groupby(enumerate(flattened), lambda k: k[0] - k[1]):
+        for _, g in itertools.groupby(enumerate(deduped), lambda k: k[0] - k[1]):
             g_start = next(g)[1]
             g_end = list(v for _, v in g) or [g_start]
             intervals.append((g_start + shift_lower, g_end[-1] + shift_upper))
@@ -116,78 +142,97 @@ def calc_intervals(
         raise ValueError("Bad value in provided values.") from error
     return intervals
 
-
+# FIXME INDEXING
 def intervals2locs(
-    intervals: pd.DataFrame | Sequence[RangeType],
-    col_from: str = "POS",
-    col_to: str = "END_POS",
+    intervals: pd.DataFrame | Sequence[tuple[int, int]],
+    col_from: str = None,
+    col_to: str = None,
     name: str = "loc",
     interval_type: IntervalType = "lower",
-    # indexing: Annotated[int, 0, 1] = 0,
     ignore_index: bool = True,
     drop_duplicates: bool = True,
     dropna: bool = True,
-) -> pd.Series:
+    to_series: bool = False
+) -> pd.Series | np.ndarray:
     """Breaks down list of ranges into individual positions
 
     Parameters
     ----------
     values: pd.DataFrame or list-like of 2-tuple ints
         Contains lower and upper bounds of the ranges
-    col_from: str
+    col_from: str, optional
         Name of column containing lower bounds (if values is pd.DataFrame).
         If None, the first column is used
-    col_to: str
+    col_to: str, optional
         Name of column containing lower bounds (if values is pd.DataFrame).
         If None, the second column is used.
-    name: str
+    name: str, optional
         Name of returned pd.Series. Default "loc"
     interval_type: IntervalType, optional
         See help(IntervalType). Default "lower" (native python range system)
-    # indexing: 0 or 1
-    #     Intervals are based on 0- or 1-indexing system. Default 1
-
-    ignore_index: bool
+    ignore_index: bool, optional
         If True, returned pd.Series index will be [0, 1, ...]. Default True
     drop_duplicates: bool
         If True, drop duplicate loc values. Default True
-    dropna: bool
+    dropna: bool, optional
         If True, drop na values. Default True
-
+    to_series: bool, optional
+        Return values as pd.Series or an np.array. Default False.
     Returns: pd.Series of locs covered by the ranges
+    
+    Usages
+    
+    >>> intervals2locs([(1, 4), (6, 8)])
+    array([1, 2, 3, 6, 7])
+    
+    >>> intervals2locs([(1, 4), (6, 8)], interval_type="closed")
+    array([1, 2, 3, 4, 6, 7, 8])
+        
+    >>> intervals2locs(pd.DataFrame([[1, 4], [2, 6]], dtype=int), name="loc")
+    array([1, 2, 3, 4, 5])
+    
+    Overlapping intervals:
+    
+    >>> intervals2locs([(1, 4), (2, 6)])
+    array([1, 2, 3, 4, 5])
+    
+    >>> intervals2locs([(1, 4), (2, 6)], drop_duplicates=False)
+    array([1, 2, 2, 3, 3, 4, 5])
+    
     """
-    colnames = [col_from, col_to]
+    colnames = ["from", "to"]
 
     if isinstance(intervals, pd.DataFrame):
         # get left and right pos
-
-        lower = default(col_from, intervals.iloc[:, 0], intervals[col_from])
-        upper = default(col_to, intervals.iloc[:, 1], intervals[col_to])
+        
+        lower = intervals.iloc[:, 0] if col_from is None else intervals[col_from]
+        upper = intervals.iloc[:, 1] if col_to is None else intervals[col_to]
 
         # concat as columns
-        intervals = pd.concat([lower, upper], axis=1, keys=colnames)
+        ranges = pd.concat([lower, upper], axis=1, keys=colnames)
     else:
         # convert to dataframe
-        intervals = pd.DataFrame(intervals, columns=colnames)
+        ranges = pd.DataFrame(intervals, columns=colnames).astype(int)
 
     # adjust left and right bounds for calling range()
     shift_start, shift_end = shift_interval(interval_type, "left")
 
     res = (
-        intervals.apply(
-            lambda ser: range(ser[col_from] + shift_start, ser[col_to] + shift_end),
+        ranges.apply(
+            lambda ser: range(
+                ser[colnames[0]] + shift_start, ser[colnames[1]] + shift_end),
             axis=1,
         )
         .explode(ignore_index=ignore_index)
         .rename(name)
+        .sort_values()
     )
     if drop_duplicates:
         res.drop_duplicates(inplace=True)
     if dropna:
         res.dropna(inplace=True)
-    if ignore_index:
-        res.reset_index(inplace=True, drop=True)
-    return res
+    
+    return res if to_series else res.values.astype(int)
 
 
 def setops_ranges(
@@ -196,28 +241,17 @@ def setops_ranges(
     col_from: str = "start",
     col_to: str = "end",
     how: Annotated[str, "right_only", "left_only", "both"] = "both",
-    interval_type: IntervalType = "left",
-    indexing: Annotated[int, 0, 1] = 0,
+    interval_type: IntervalType = "lower",
     **intervals2locs_kws,
 ):
     """Compare two list of ranges and calculate different sets of intervals.
 
     Parameters
     ----------
-
     how: 'right_only', 'left_only', or 'both'
         Subset of locs to keep
-    interval_type:  'left', 'lower', 'right', 'upper', 'both', True, False, or None
-        Treat ranges as interval_type on the
-        - 'left' or 'lower':  left/lower bound only, i.e. [from, to)
-        - 'right' or 'upper': right/upper bound only, i.e. (from, to]
-        - 'both' or True:     both bounds (interval is interval_type), i.e. [from, to]
-        - None or False:      interval is open, i.e. (from, to)
-        This is used by intervals2locs() and calc_intervals()
-        Default 'lower' (which is the native python range interpretation)
-    indexing: 0 or 1
-        Intervals are based on 0- or 1-indexing system. Default 1
-
+    interval_type:  IntervalType
+        Default "lower" (lower bound closed, upper open)
     **intervals2locs_kws are additional kws passed to intervals2locs(). ** takes:
         - name
         - drop_duplicates
@@ -226,7 +260,6 @@ def setops_ranges(
 
     Returns: pd.DataFrame of col_start: int, col_end: int
     """
-
     if isinstance(interval_1, Hashable):
         interval_1 = [interval_1]
     if isinstance(interval_2, Hashable):
@@ -237,7 +270,7 @@ def setops_ranges(
         "col_from": col_from,
         "col_to": col_to,
         "interval_type": interval_type,
-        "indexing": indexing,
+        "to_series": True,
     } | intervals2locs_kws
 
     locs_1 = intervals2locs(interval_1, **intervals2locs_kws)
@@ -249,9 +282,7 @@ def setops_ranges(
         .drop("_merge", axis=1)
         .squeeze(axis=1)
     )
-
-    # provide calc_intervals with interval_type=interval_type so it outputs the same
-    # interval format as our input
+    # consolidate locs into ranges
     intervals = pd.DataFrame(
         calc_intervals(keep_locs, sort=True, interval_type=interval_type),
         columns=[col_from, col_to],
@@ -268,7 +299,40 @@ def shift_interval(
     left: int = None,
     right: int = None,
 ) -> RangeType:
-    """Returns values to shift left/lower and right/upper bounds"""
+    """Returns values to shift left/lower and right/upper bounds
+    
+    shift values should be added to the bound value, i.e.
+    old_bound + shift = new_bound
+    
+    Usage:
+    >>> shift_interval("left", "closed")
+    (0, -1)
+    
+    >>> shift_interval("right", "closed")
+    (1, 0)
+    
+    >>> shift_interval("left", "right")
+    (-1, -1)
+    
+    >>> shift_interval("closed", "left")
+    (0, 1)
+    
+    >>> shift_interval("left", "left")
+    (0, 0)
+    
+    >>> shift_interval("left", "open")
+    (-1, 0)
+    
+    >>> shift_interval("open", "closed")
+    (1, -1)
+    
+    >>> shift_interval("left", "left", 0, 1)
+    (1, 1)
+    
+    >>> shift_interval("closed", "right", 1, 0)
+    (-2, -1)
+    
+    """
     match interval_type_from:  # shift from this to left closed, right open
         case "right" | "upper":  # left
             shift_left = 1
@@ -278,9 +342,9 @@ def shift_interval(
             shift_left = 0
             shift_right = 1
 
-        case "open" | None | False:  # POS - 1, POS + len(REF)
+        case "open" | False:  # POS - 1, POS + len(REF)
             shift_left = 1
-            shift_right = -1
+            shift_right = 0
 
         case "left" | "lower":  # POS, POS + len(REF)
             shift_left = 0
@@ -298,7 +362,7 @@ def shift_interval(
             shift_left += 0
             shift_right += -1
 
-        case "open" | None | False:  # POS - 1, POS + len(REF)
+        case "open" | False:  # POS - 1, POS + len(REF)
             shift_left += -1
             shift_right += 0
 
