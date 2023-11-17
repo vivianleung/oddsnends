@@ -424,14 +424,17 @@ def rank_sort(
 
 
 
+
 def reorder_cols(
     df: pd.DataFrame,
     first: Hashable | Sequence[Hashable] | pd.Index | None = None,
     last: Hashable | Sequence[Hashable] | pd.Index | None = None,
     inplace: bool = False,
-    ascending: bool = None,
-    sort_kws: dict = None,
+    sort: bool = False,
+    key: Callable = None,
+    reverse: bool = None,
     errors: Annotated[str, "ignore", "warn", "raise"] = "ignore",
+    **kws
 ) -> pd.DataFrame | None:
     """Reorders columns of dataframe.
 
@@ -440,12 +443,28 @@ def reorder_cols(
         first: column label, list of labels or pd.Index to put first
         last: column label, list of labels or pd.Index to put last
         inplace: bool, default False
+            Note: this is deprecated. Use 'reverse' and 'key' kwargs
+            
+        sort: bool, optional
+            Sort middle columns. Default False.
+        key: Callable, optional
+            Sort middle cols by this. (passed to `sorted`). Default None
+        reverse: Callable, optional
+            passed to `sorted. Default None
+
+        **kws:
+        
+        Deprecated:
+        ----------
         ascending: bool, default None
             how to sort remaining columns, where True is ascending, False is
-            descending, and None is not sorted
+            descending, and None is not sorted.
+                        
         sort_kws: dict, default None
-            kwargs to pass to pd.DataFrame.sort_index() func
-
+            kwargs to pass to `sorted()` on middle columns. Use `reverse` and
+            `key`
+            
+            
     Returns: pd.DataFrame if inplace is False, else None.
     """
     # check input df object is not empty
@@ -456,43 +475,91 @@ def reorder_cols(
             logging.warning("Warning: Empty DataFrame")
         return df
 
+    # defaults
+    try:
+        assert key is None
+        key = kws["sort_kws"]["key"]
+    except (AssertionError, KeyError):
+        pass
+    
+    try:
+        assert reverse is None
+        reverse = kws["sort_kws"].get(
+            "reverse", kws["sort_kws"].get("ascending"))
+    except (AssertionError, KeyError):
+        pass
+            
+
     # check if first and last cols are in df (filter out ones that aren't)
     if first is None:
         first = []
     else:
-        if not isinstance(first, (pd.Index, MutableSequence)):
-            first = default(first, [], has_value=[first])
+        if isinstance(first, Hashable):
+            first = default(first, [], [first])
+        elif not isinstance(first, (pd.Index, MutableSequence)):
+            first = list(first)
+            first = default(first, [])
+
         first = check_if_exists(first, df.columns, errors=errors)
 
     if last is None:
         last = []
     else:
-        if not isinstance(last, (pd.Index, MutableSequence)):
-            last = default(last, [], has_value=[last])
+        if isinstance(last, Hashable):
+            last = default(last, [], [last])
+        elif not isinstance(last, (pd.Index, MutableSequence)):
+            last = list(last)
+            last = default(last, [])
+
         last = check_if_exists(last, df.columns, errors=errors)
 
     # list of other (unspecified) columns
-    mid = df.drop(first, axis=1).drop(last, axis=1)
+    mid = df.columns.drop([*first, *last])
 
-    if isinstance(ascending, bool):
-        mid = mid.sort_index(axis=1, ascending=ascending, **default(sort_kws, {}))
+    if sort:
+        mid = sorted(mid, key=key, reverse=reverse)
 
     if inplace:
-        # arrange and store a copy of left side before dropping below
-        left = pd.concat([df.loc[:, first], mid], axis=1)
+            
+        left = [*first, *mid]
+        right = last
 
-        # reverse to insert at 0 during .apply
-        left = left[list(reversed(left.columns))]
+        # check sizes to minimize the number of columns we need to move
+        if len(left) < len(right):
+            
+            # left has fewer than right, so move the left side columns
+            # store left side before dropping from df
+            left_df = df.loc[:, left]
 
-        # drop left columns inplace
-        df.drop([*first, *mid.columns], axis=1, inplace=True)
+            # drop left columns inplace
+            df.drop(left, axis=1, inplace=True)
+            
+            # reverse to insert at 0 during .apply
+            for label in reversed(left):
 
-        # put left columns back into the df in the new order
-        left.apply(lambda col: df.insert(0, col.name, col))
+                # put columns back into the df in the new order
+                df.insert(0, label, left_df[label])
+                
+        else:  
+            # prefer to keep left in place so id(df) is the same
+            # store left side before dropping from df
+            
+            # store right side before dropping
+            right_df = df.loc[:, right]
 
+            # drop right columns inplace
+            df.drop(right, axis=1, inplace=True)
+
+            # put columns back into the df in the new order
+            i = len(df.columns)
+            
+            for label in right:
+                df.insert(i, label, right_df[label])
+                i += 1
     else:
-        # simply concat and return a new copy
-        return pd.concat([df.loc[:, first], mid, df.loc[:, last]], axis=1)
+        return pd.concat([df.loc[:, first], df.loc[:, mid], df.loc[:, last]],
+                        axis=1)
+
 
 
 def sort_levels(
