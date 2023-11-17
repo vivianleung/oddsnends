@@ -414,7 +414,7 @@ def rank_sort(
             # generate hash where index corresponds to `data` index and
             # values are the rank metric
             rank_hash = pd.Series(range(len(data_rank)), index=data_rank.index)
-            data.sort_values(key=lambda x: rank_hash.loc[x], inplace=True)
+            data.sort_values(key=lambda x: rank_hash[x], inplace=True)
 
         elif not keep_col:  # not inplace
             return data_rank.droplevel("_rank")
@@ -438,34 +438,38 @@ def reorder_cols(
 ) -> pd.DataFrame | None:
     """Reorders columns of dataframe.
 
-    Arguments:
-        df: pd.DataFrame
-        first: column label, list of labels or pd.Index to put first
-        last: column label, list of labels or pd.Index to put last
-        inplace: bool, default False
-            Note: this is deprecated. Use 'reverse' and 'key' kwargs
+    Parameters
+    ----------
+    df: pd.DataFrame
+    first: column label, list of labels or pd.Index to put first
+    last: column label, list of labels or pd.Index to put last
+    inplace: bool, default False
+        Note: this is deprecated. Use 'reverse' and 'key' kwargs
 
-        sort: bool, optional
-            Sort middle columns. Default False.
-        key: Callable, optional
-            Sort middle cols by this. (passed to `sorted`). Default None
-        reverse: Callable, optional
-            passed to `sorted. Default None
+    sort: bool, optional
+        Sort middle columns. Default False.
+    key: Callable, optional
+        Sort middle cols by this. (passed to `sorted`). Default None
+    reverse: Callable, optional
+        passed to `sorted. Default None
 
-        **kws:
+    **kws:
 
-        Deprecated:
-        ----------
-        ascending: bool, default None
-            how to sort remaining columns, where True is ascending, False is
-            descending, and None is not sorted.
+    [Deprecated]:
+    
+    ascending: bool, default None
+        how to sort remaining columns, where True is ascending, False is
+        descending, and None is not sorted.
 
-        sort_kws: dict, default None
-            kwargs to pass to `sorted()` on middle columns. Use `reverse` and
-            `key`
+    sort_kws: dict, default None
+        kwargs to pass to `sorted()` on middle columns. Use `reverse` and
+        `key`
 
-
-    Returns: pd.DataFrame if inplace is False, else None.
+    Returns
+    -------
+    pd.DataFrame or None
+        None if inplace=True, else rearranged DataFrame
+        
     """
     # check input df object is not empty
     if len(df.columns) == 0:
@@ -530,13 +534,12 @@ def reorder_cols(
             _reorder_mid_inplace(df, mid, len(first))
 
     else:
-        return pd.concat([df.loc[:, first], df.loc[:, mid], df.loc[:, last]],
-                        axis=1)
+        return pd.concat([df[first], df[mid], df[last]], axis=1)
 
 
 def _reorder_left_inplace(_df, _left: Sequence[Hashable]) -> None:
     # store left side before dropping from df
-    left_df = _df.loc[:, _left]
+    left_df = _df[_left]
 
     # drop left columns inplace
     _df.drop(_left, axis=1, inplace=True)
@@ -550,7 +553,7 @@ def _reorder_left_inplace(_df, _left: Sequence[Hashable]) -> None:
 
 def _reorder_right_inplace(_df, _right: Sequence[Hashable]) -> None:
     # store right side before dropping
-    right_df = _df.loc[:, _right]
+    right_df = _df[_right]
 
     # drop right columns inplace
     _df.drop(_right, axis=1, inplace=True)
@@ -565,7 +568,7 @@ def _reorder_right_inplace(_df, _right: Sequence[Hashable]) -> None:
 
 def _reorder_mid_inplace(_df, _mid: Sequence[Hashable], _at: int) -> None:
     # store right side before dropping
-    mid_df = _df.loc[:, _mid]
+    mid_df = _df[_mid]
 
     # drop right columns inplace
     _df.drop(_mid, axis=1, inplace=True)
