@@ -82,7 +82,7 @@ def alias_crossref(data: pd.DataFrame,
         aliased_genotypes.columns = pd.MultiIndex.from_tuples(
             aliased_genotypes.columns, names=aliased_genotypes.columns.names
         )
-    
+
     # also drops the 'rows' index levels
     xrefs = aliased.reset_index(alias_name).set_index(alias_name)
 
@@ -212,7 +212,7 @@ def group_identical_rows(
         raise TypeError(
             "`id_col` should be a single (hashable) label",
             type(id_col), id_col)
-    
+
     if not isinstance(value_col, Hashable):
         raise TypeError(
             "`value_col` should be a single (hashable) label",
@@ -444,7 +444,7 @@ def reorder_cols(
         last: column label, list of labels or pd.Index to put last
         inplace: bool, default False
             Note: this is deprecated. Use 'reverse' and 'key' kwargs
-            
+
         sort: bool, optional
             Sort middle columns. Default False.
         key: Callable, optional
@@ -453,18 +453,18 @@ def reorder_cols(
             passed to `sorted. Default None
 
         **kws:
-        
+
         Deprecated:
         ----------
         ascending: bool, default None
             how to sort remaining columns, where True is ascending, False is
             descending, and None is not sorted.
-                        
+
         sort_kws: dict, default None
             kwargs to pass to `sorted()` on middle columns. Use `reverse` and
             `key`
-            
-            
+
+
     Returns: pd.DataFrame if inplace is False, else None.
     """
     # check input df object is not empty
@@ -481,14 +481,14 @@ def reorder_cols(
         key = kws["sort_kws"]["key"]
     except (AssertionError, KeyError):
         pass
-    
+
     try:
         assert reverse is None
         reverse = kws["sort_kws"].get(
             "reverse", kws["sort_kws"].get("ascending"))
     except (AssertionError, KeyError):
         pass
-            
+
 
     # check if first and last cols are in df (filter out ones that aren't)
     if first is None:
@@ -520,46 +520,61 @@ def reorder_cols(
         mid = sorted(mid, key=key, reverse=reverse)
 
     if inplace:
-            
-        left = [*first, *mid]
-        right = last
 
-        # check sizes to minimize the number of columns we need to move
-        if len(left) < len(right):
-            
-            # left has fewer than right, so move the left side columns
-            # store left side before dropping from df
-            left_df = df.loc[:, left]
+        if len(last) > 0:
+            _reorder_right_inplace(df, last)
+        if len(first) > 0:
+            _reorder_left_inplace(df, first)
 
-            # drop left columns inplace
-            df.drop(left, axis=1, inplace=True)
-            
-            # reverse to insert at 0 during .apply
-            for label in reversed(left):
+        if sort and len(mid) > 0:
+            _reorder_mid_inplace(df, mid, len(first))
 
-                # put columns back into the df in the new order
-                df.insert(0, label, left_df[label])
-                
-        else:  
-            # prefer to keep left in place so id(df) is the same
-            # store left side before dropping from df
-            
-            # store right side before dropping
-            right_df = df.loc[:, right]
-
-            # drop right columns inplace
-            df.drop(right, axis=1, inplace=True)
-
-            # put columns back into the df in the new order
-            i = len(df.columns)
-            
-            for label in right:
-                df.insert(i, label, right_df[label])
-                i += 1
     else:
         return pd.concat([df.loc[:, first], df.loc[:, mid], df.loc[:, last]],
                         axis=1)
 
+
+def _reorder_left_inplace(_df, _left: Sequence[Hashable]) -> None:
+    # store left side before dropping from df
+    left_df = _df.loc[:, _left]
+
+    # drop left columns inplace
+    _df.drop(_left, axis=1, inplace=True)
+
+    # reverse to insert at 0
+    for label in reversed(_left):
+
+        # put columns back into the df in the new order
+        _df.insert(0, label, left_df[label])
+
+
+def _reorder_right_inplace(_df, _right: Sequence[Hashable]) -> None:
+    # store right side before dropping
+    right_df = _df.loc[:, _right]
+
+    # drop right columns inplace
+    _df.drop(_right, axis=1, inplace=True)
+
+    # put columns back into the df in the new order
+    i = len(_df.columns)
+
+    for label in _right:
+        _df.insert(i, label, right_df[label])
+        i += 1
+
+
+def _reorder_mid_inplace(_df, _mid: Sequence[Hashable], _at: int) -> None:
+    # store right side before dropping
+    mid_df = _df.loc[:, _mid]
+
+    # drop right columns inplace
+    _df.drop(_mid, axis=1, inplace=True)
+
+    # reverse to insert at _at
+    # put columns back into the df in the new order
+    for label in reversed(_mid):
+
+        _df.insert(_at, label, mid_df[label])
 
 
 def sort_levels(
