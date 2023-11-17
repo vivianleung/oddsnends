@@ -18,6 +18,7 @@ __all__ = [
     "defaults",
     "isnull",
     "notnull",
+    # "length",
     "msg",
     "now",
     "parse_literal_eval",
@@ -115,7 +116,7 @@ def _isnull(
             assert len(x) > 0
 
         if isinstance(x, NDFrame):
-            raise ValueError("Cannot check values in NDFrames", x)
+            raise TypeError("Cannot check values in NDFrames", x)
 
         for n in null_values:  # "nan is nan" returns True but nan != nan
             assert (x != n) and (x is not n)
@@ -186,23 +187,23 @@ def defaults(*values: Any, **kwargs) -> Any:
     >>> defaults("hello", "world", has_value=lambda s: f"{s} and good night")
     'hello and good night'
     """
-        
+
     # figure out what counts as a null value
     null_values = kwargs.get("null_values", [None, nan])
     if isinstance(null_values, Hashable):
         null_values = [null_values]
 
     empty = kwargs.get("empty", True)
-    
+
     # initialize vars
-    isnull = True  
-    
+    isnull = True
+
     try:
         val = values[0]
-        
+
     except IndexError as error:
         raise TypeError("Must provide at least one value") from error
-    
+
     for val in values:
         isnull = _isnull(val, null_values, empty=empty, do_raise=False)
         if not isnull:
@@ -228,6 +229,13 @@ def defaults(*values: Any, **kwargs) -> Any:
 
 
 #%%
+# def length(obj: Any) -> int:
+#     """Returns length of 'obj', handling Hashables and None values"""
+#     if isinstance(obj, Collection) and not isinstance(obj, Hashable):
+#         return len(obj)
+#     elif isnull(obj):
+#         return 0
+#     return 1
 
 def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:
     """Writes message to stream"""
