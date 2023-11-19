@@ -1,0 +1,31 @@
+{% set name = "oddsnends" %}
+{% set version = "0.1.3" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: 84fe67e6ed8fb3662b84dad48a1a03493463991779c3e0ca0dbb092d44d4fbf2
+
+build:
+  number: 0
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv "
+
+requirements:
+  host:
+    - pip
+    - python
+  run:
+    - python
+
+test:
+  imports:
+    - 
+
+about:
+  home: https://github.com/vivianleung/genomicspy.git
+  license: MIT
+  license_family: MIT
+  summary: Miscellaneous data science methods

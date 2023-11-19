@@ -41,8 +41,11 @@ class SmartFormatter(HelpFormatter):
 
 
 def assertfile(fpath: str | None, *err_args,
-               null: Annotated[str, "ignore", "raise"] = "ignore") -> None:
+               null: Annotated[str, "ignore", "raise"] = "ignore",
+               follow_symlinks: bool = True) -> None:
     """Asserts isfile. Raises FileNotFoundError only if fpath is non-null."""
+    if follow_symlinks:
+        fpath = os.path.realpath(fpath)
     try:
         assert os.path.isfile(fpath)
     except AssertionError as error:
@@ -53,9 +56,13 @@ def assertfile(fpath: str | None, *err_args,
 
 
 def assertexists(
-    fpath: str | None, *err_args, null: Annotated[str, "ignore", "raise"] = "ignore"
+    fpath: str | None, *err_args,
+    null: Annotated[str, "ignore", "raise"] = "ignore",
+    follow_symlinks: bool = True,
 ) -> None:
     """Asserts exists. Raises FileNotFoundError only if fpath is non-null."""
+    if follow_symlinks:
+    fpath = os.path.realpath(fpath)
     try:
         assert os.path.exists(fpath)
     except AssertionError as error:
@@ -64,11 +71,13 @@ def assertexists(
         if (fpath is not None) or (null == "raise"):
             raise TypeError(fpath, type(fpath)) from error
 
-def argtype_filepath(parser: ArgumentParser, arg: str | None) -> str:
+def argtype_filepath(parser: ArgumentParser, arg: str | None, follow_symlinks: bool = True) -> str:
     """Check if arg given to parser is a valid file, raising ArgumentError
     otherwise
     """
     arg = arg.strip()
+    if follow_symlinks:
+        arg = os.path.realpath(arg)
     try:
         assert os.path.isfile(arg)
     except (AssertionError, TypeError):
