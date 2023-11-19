@@ -40,33 +40,38 @@ class SmartFormatter(HelpFormatter):
 
 
 
-def assertfile(fpath: str | None, *err_args,
+def assertfile(filepath: str | None, *err_args,
                null: Annotated[str, "ignore", "raise"] = "ignore",
                follow_symlinks: bool = True) -> None:
     """Asserts isfile. Raises FileNotFoundError only if fpath is non-null."""
-    if follow_symlinks:
-        fpath = os.path.realpath(fpath)
+    
+    fpath = os.path.realpath(filepath) if follow_symlinks else filepath
     try:
-        assert os.path.isfile(fpath)
+        assert os.path.isfile(fpath), fpath
+        
     except AssertionError as error:
-        raise FileNotFoundError(fpath, *err_args) from error
+        raise FileNotFoundError(filepath, f"(realpath: {fpath}") from error
+    
     except TypeError as error:
         if (fpath is not None) or (null == "raise"):
-            raise TypeError(fpath, type(fpath)) from error
+            raise TypeError(filepath, type(filepath)) from error
 
 
 def assertexists(
-    fpath: str | None, *err_args,
+    filepath: str | None, *err_args,
     null: Annotated[str, "ignore", "raise"] = "ignore",
     follow_symlinks: bool = True,
 ) -> None:
     """Asserts exists. Raises FileNotFoundError only if fpath is non-null."""
-    if follow_symlinks:
-    fpath = os.path.realpath(fpath)
+    
+    fpath = os.path.realpath(filepath) if follow_symlinks else filepath
     try:
+        assert os.path.exists(fpath), fpath
+        
         assert os.path.exists(fpath)
     except AssertionError as error:
-        raise FileNotFoundError(fpath, *err_args) from error
+        raise FileNotFoundError(filepath, f"(realpath: {fpath}") from error
+
     except TypeError as error:
         if (fpath is not None) or (null == "raise"):
             raise TypeError(fpath, type(fpath)) from error
@@ -75,14 +80,13 @@ def argtype_filepath(parser: ArgumentParser, arg: str | None, follow_symlinks: b
     """Check if arg given to parser is a valid file, raising ArgumentError
     otherwise
     """
-    arg = arg.strip()
-    if follow_symlinks:
-        arg = os.path.realpath(arg)
+    fpath = os.path.realpath(arg.strip()) if follow_symlinks else arg.strip()
+
     try:
-        assert os.path.isfile(arg)
-    except (AssertionError, TypeError):
-        parser.error(f"file does not exist: {arg}")
-    return arg
+        assert os.path.isfile(fpath), fpath
+        
+    except (AssertionError, TypeError) as error:
+        parser.error(f"File not found: {arg} (realpath {fpath})")
 
 
 def find_fpaths(
