@@ -4,7 +4,7 @@
 import gzip
 import os
 import pickle
-from argparse import ArgumentParser, HelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultHelpFormatter
 from collections.abc import Callable, Generator
 from typing import Annotated, Any
 
@@ -27,7 +27,7 @@ LoggingLevels = {
     "CRITICAL": 50,
 }
 
-class SmartFormatter(HelpFormatter):
+class SmartFormatter(ArgumentDefaultHelpFormatter):
     """SmartFormatter for parser
     
     source: https://stackoverflow.com/a/22157136/3352659
@@ -36,7 +36,7 @@ class SmartFormatter(HelpFormatter):
         if text.startswith("R|"):
             return text[2:].splitlines()
         # this is the RawTextHelpFormatter._split_lines
-        return HelpFormatter._split_lines(self, text, width)
+        return ArgumentDefaultHelpFormatter._split_lines(self, text, width)
 
 
 
