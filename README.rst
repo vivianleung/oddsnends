@@ -31,7 +31,7 @@ Classes
 
 Types
 -----
-* ``ClosedIntervalType``
+* ``IntervalType``
 * ``LoggingLevels``
 * ``NoneType``
 * ``Numeric``

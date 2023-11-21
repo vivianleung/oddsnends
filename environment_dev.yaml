@@ -1,0 +1,18 @@
+channels:
+- conda-forge
+dependencies:
+- build
+- bump2version
+- coverage
+- flake8
+- ipykernel
+- ipython
+- jupyter
+- pip>=23.3
+- pyright
+- setuptools
+- Sphinx
+- tox
+- twine
+- watchdog
+- wheel>=0.38.1

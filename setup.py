@@ -14,7 +14,7 @@ with open('HISTORY.rst') as history_file:
 
 requirements = [ ]
 
-test_requirements = [ ]
+test_requirements = ["doctest", "pytest", "pytest-cov"]
 
 setup(
     author="Vivian Leung",

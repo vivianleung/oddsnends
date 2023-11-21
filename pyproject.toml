@@ -28,6 +28,8 @@ dependencies = [
   "numpy",
   "pandas>=2.1",
   "regex",
+  "pip>=23.3",
+  "wheel>=0.38.1",
 ]
 
 dynamic = ["license"]
@@ -39,3 +41,6 @@ keywords = ["oddsnends"]
 "Bug Tracker" = "https://github.com/vivianleung/pyvcftools/issues"
 
 
+[tool.pytest]
+addopts = ["--doctest-modules"]
+doctest_optionflags= ["NORMALIZE_WHITESPACE", "ELLIPSIS"]

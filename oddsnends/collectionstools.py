@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Collection, Hashable
-from typing import Any, Annotated
+from typing import Any
 
 from pandas import notnull
 
@@ -24,13 +24,13 @@ class AttrDict(dict):
     def __init__(self, **kws):
         for k, v in kws.items():
             setattr(self, k, v)
-    
+
     def __getattr__(self, attr: Hashable, **d):
         return self.__getitem__(attr, **d)
-    
+
     def __setattr__(self, attr: Hashable, value: Any):
         return self.__setitem__(attr, value)
-    
+
     def __delattr__(self, attr: Hashable) -> None:
         return self.__delitem__(attr)
 
@@ -59,7 +59,7 @@ drop_duplicates = _drop_duplicates  # for overloading in simplify()
 def _dropna(values: Any) -> Any:
     try:
         assert values is not None
-        filtered = filter(lambda x: notnull(x), values)
+        filtered = filter(notnull, values)
     except (AssertionError, TypeError):
         return values
     else:
@@ -69,7 +69,7 @@ dropna = _dropna  # for overloading in simplify()
 
 def pops(dct: dict, *keys, **kws) -> list[Any]:
     """Pop multiple keys from a dict. if kw 'd' is given, uses d as default
-    **kws takes: 
+    **kws takes:
         d: Any. Returns a default value.
         errors: 'ignore' or 'raise'. Default "ignore
     """
@@ -79,18 +79,21 @@ def pops(dct: dict, *keys, **kws) -> list[Any]:
         except KeyError as error:
             if _errors == "raise":
                 raise error
-        
+
     errors = kws.pop("errors", "ignore")
     try:
         d = kws.pop('d')
     except KeyError:
         return [_pop_(dct, k, errors) for k in keys]
-    
+
     return [dct.pop(k, d) for k in keys]
 
 
-def simplify(value: Any):
-
+def simplify(value: Any) -> Any:
+    """Simplify value to a single value, if collection has only one value
+    
+    
+    """
     try:
         assert len(value) != 1, 1
         assert len(value) != 0, 0
@@ -111,4 +114,3 @@ def simplify(value: Any):
 def strictcollection(value: Any) -> bool:
     """Check if value is a Collection and not a string-like"""
     return isinstance(value, Collection) and not isinstance(value, str)
-

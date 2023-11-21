@@ -1,18 +1,19 @@
-"""ioa.py"""
+"""Input, output and args-related"""
 
 # Input, output and args-related
 import gzip
 import os
 import pickle
-from argparse import ArgumentParser
+from argparse import ArgumentParser, HelpFormatter
 from collections.abc import Callable, Generator
 from typing import Annotated, Any
 
 __all__ = [
     "LoggingLevels",
+    "SmartFormatter",
     "assertfile",
     "assertexists",
-    "filepath",
+    "argtype_filepath",
     "find_fpaths",
     "read_pkl_gz",
 ]
@@ -26,10 +27,21 @@ LoggingLevels = {
     "CRITICAL": 50,
 }
 
+class SmartFormatter(HelpFormatter):
+    """SmartFormatter for parser
+    
+    source: https://stackoverflow.com/a/22157136/3352659
+    """
+    def _split_lines(self, text, width):
+        if text.startswith("R|"):
+            return text[2:].splitlines()
+        # this is the RawTextHelpFormatter._split_lines
+        return HelpFormatter._split_lines(self, text, width)
 
-def assertfile(
-    fpath: str | None, *err_args, null: Annotated[str, "ignore", "raise"] = "ignore"
-) -> None:
+
+
+def assertfile(fpath: str | None, *err_args,
+               null: Annotated[str, "ignore", "raise"] = "ignore") -> None:
     """Asserts isfile. Raises FileNotFoundError only if fpath is non-null."""
     try:
         assert os.path.isfile(fpath)
@@ -52,8 +64,7 @@ def assertexists(
         if (fpath is not None) or (null == "raise"):
             raise TypeError(fpath, type(fpath)) from error
 
-
-def filepath(parser: ArgumentParser, arg: str | None) -> str:
+def argtype_filepath(parser: ArgumentParser, arg: str | None) -> str:
     """Check if arg given to parser is a valid file, raising ArgumentError
     otherwise
     """

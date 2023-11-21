@@ -5,8 +5,6 @@
 
 import unittest
 
-from oddsnends import oddsnends
-
 
 class TestOddsnends(unittest.TestCase):
     """Tests for `oddsnends` package."""

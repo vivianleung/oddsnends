@@ -2,7 +2,6 @@
 import argparse
 import sys
 
-
 def main():
     """Console script for oddsnends."""
     parser = argparse.ArgumentParser()
