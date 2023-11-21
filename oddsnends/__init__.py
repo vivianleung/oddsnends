@@ -1,4 +1,4 @@
-from .collections import *
+from .collectionstools import *
 from .intervals import *
 from .ioa import *
 from .math import *
