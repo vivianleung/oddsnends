@@ -10,9 +10,14 @@ dependencies:
 - jupyter
 - pip>=23.3
 - pyright
-- setuptools
 - Sphinx
 - tox
+- toml
 - twine
 - watchdog
 - wheel>=0.38.1
+- hatch
+- hatch-requirements-txt
+- pytest
+- pytest-cov
+- doctest
