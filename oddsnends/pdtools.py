@@ -3,7 +3,7 @@
 # pandas tools
 from __future__ import annotations
 import logging
-from collections.abc import Hashable, MutableSequence, Sequence
+from collections.abc import Callable, Hashable, MutableSequence, Sequence
 from typing import Annotated, TypeVar
 
 import numpy as np
@@ -14,14 +14,16 @@ from oddsnends.main import default
 
 __all__ = [
     "SeriesType",
+    "alias_crossref",
     "assign",
     "check_if_exists",
-    "dedup_alias",
+    "drop_labels",
     "group_identical_rows",
     "pipe_concat",
     "get_level_uniques",
     "ordered_fillna",
     "pivot_indexed_table",
+    "rank_sort",
     "reorder_cols",
     "sort_levels",
     "swap_index",
@@ -29,6 +31,64 @@ __all__ = [
 
 
 SeriesType = TypeVar("SeriesType")
+
+
+def alias_crossref(data: pd.DataFrame,
+                   alias_name: Hashable = "ALIAS",
+                   alias_prefix: str = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Assign and reindex `data` with alias (with prefix) to rows
+
+    Please sort your data beforehand.
+
+    Parameters
+    ----------
+    data: pd.Series or pd.DataFrame
+        The data to alias
+    alias_name : Hashable, optional
+        Name of the output alias column
+    alias_prefix : formatter string
+        Prefix for alias. Default None.
+
+    Returns
+    -------
+    pd.DataFrame
+        `data` indexed with new aliases
+    pd.DataFrame
+        Cross-ref with index as aliases, values as (lists of) `data` indices
+    """
+
+    # make aliases
+    if alias_prefix is None:
+        aliases = range(len(data))
+
+    else:
+        pad = len(str(len(data)))
+        formatter = f"{alias_prefix}{{0:0{pad}d}}".format
+        aliases = [formatter(x) for x in range(len(data))]
+
+    # make new dataframe (index.to_frame is faster than reset_index)
+    aliased = data.assign(
+        **{alias_name: aliases}).set_index(alias_name, append=True)
+
+    aliased_genotypes = (
+        aliased.index.to_frame()
+        .droplevel(data.index.names, axis=0)
+        .drop(alias_name, axis=1)
+    )
+
+    # re-format columns index
+    if isinstance(aliased_genotypes.columns, pd.MultiIndex):
+        aliased_genotypes.columns = pd.MultiIndex.from_tuples(
+            aliased_genotypes.columns, names=aliased_genotypes.columns.names
+        )
+
+    # also drops the 'rows' index levels
+    xrefs = aliased.reset_index(alias_name).set_index(alias_name)
+
+    return aliased_genotypes, xrefs
+
+
 
 
 def assign(ser: pd.Series, **kwargs) -> pd.DataFrame:
@@ -80,14 +140,50 @@ def check_if_exists(
     return np.array(labels)[which_labels]
 
 
+def drop_labels(data: pd.DataFrame | pd.Series,
+                drop: Hashable | Sequence[Hashable] = None,
+                keep: Hashable | Sequence[Hashable] = None,
+                inplace: bool = False
+                ) -> pd.DataFrame | pd.Series | None:
+    """Drop labels from index or columns of a DataFrame or Series
+
+    Specify either `keep` or `drop`, but not both.
+    """
+    if keep is not None:
+        if drop is not None:
+            raise TypeError("Can't specify both `keep` and `drop`.")
+
+        drop_cols = set(data.columns).difference(keep)
+        drop_levels = set(data.index.names).difference(keep)
+
+    elif drop is not None:
+        drop = set(drop)
+        drop_cols = drop.intersection(data.columns)
+        drop_levels = drop.intersection(data.index.names)
+
+    else:
+        raise TypeError('`keep` and `drop` were both None.')
+
+    drop_cols = list(drop_cols)
+    drop_levels = list(drop_levels)
+    if inplace:
+        data.drop(drop_cols, axis=1, inplace=True)
+        data.reset_index(drop_levels, drop=True, inplace=True)
+
+    else:
+        return data.drop(drop_cols, axis=1).reset_index(drop_levels, drop=True)
+
+
+
+
+#TODO tests
 def group_identical_rows(
     data: pd.DataFrame,
-    alias_name: Hashable = "ALIAS",
-    alias_prefix: str = None,
-    rank_ascending: bool = None,
-    force_lists: bool = False,
+    id_col: Hashable,
+    value_col: Hashable,
+    colnames: Hashable | Sequence[Hashable] = None,
     **sort_kws,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> pd.Series:
     """Generates a dataframe of unique rows and lists of indices corresponding
     to groups of identical rows and each group assigned a unique alias
 
@@ -95,135 +191,59 @@ def group_identical_rows(
     ----------
     data : pd.DataFrame
         A pandas DataFrame containing the data to be grouped and deduplicated.
-    alias_name : Hashable, optional
-        Name of the output alias column
-    alias_prefix : str
-        Prefix for aliases. If None, no prefix is added. Defaults to None
-    rank_ascending: bool or Noned
-        After sorting index, rank unique entries by popularity (most common) in
-        descending (rank_sort first) or ascending (rank_sort last) order, or
-        don't do (None), by default None.
-    force_lists : bool, optional
-        Whether the grouped `data` indices should be forced to be lists. If set
-        to True, single-member groups will also be represented as lists.
-        If False, single indices will not be wrapped in a list.
+    id_col: Hashable
+        Label of column containing ids to group (e.g. "SAMPLE") (as row index)
+    value_col: Hashable
+        Label of column containing values for comparing entries  pivot_cols: Hashable or sequence of Hashables  Column label(s) to use as columns in pivot table
+    colnames: Hashable or Sequence of Hashables
+        names in columns/index to unstack
+    **sort_kws: passed to sort_index on columns (axis=1)
 
     Returns
     -------
-    pd.DataFrame
-        Deduplicated dataframe with index as the unique `data` rows, columns as
-        the index names, and values as grouped `data` indices, plus alias.
-    pd.DataFrame
-        Cross-ref with index as aliases, values as (lists of) `data` indices
+    pd.Series
+        Deduplicated data with index as the unique rows in `data` and values as
+        lists of ids
     """
+    def _sort_data(_data, _key, **_sort_kws):
+        return _data.sort_values(sort_key=_key, **_sort_kws)
 
-    # group rows via. pivot_table. faster than groupby
-    pivoted = (
-        data.reset_index()
-        .pivot_table(data.index.names, data.columns.to_list(), aggfunc=lambda x: x)
-        .sort_index(**sort_kws)
+    if not isinstance(id_col, Hashable):
+        raise TypeError(
+            "`id_col` should be a single (hashable) label",
+            type(id_col), id_col)
+
+    if not isinstance(value_col, Hashable):
+        raise TypeError(
+            "`value_col` should be a single (hashable) label",
+            type(value_col), value_col)
+
+    if colnames is None:
+        colnames = [*data.index.names, *data.columns]
+        colnames.remove(id_col)
+        colnames.remove(value_col)
+
+    # put id_col in index to accommodate multiindex columns
+    extra_index = list(set(colnames).difference([*data.index.names, id_col]))
+
+    broad = (
+        data
+        .set_index(extra_index, append=True)
+        .unstack(colnames)
+        .droplevel(0, axis=1)
+        .sort_index(axis=0)  # sort in prep for pivot_table
+        .reset_index()
+        .sort_index(axis=1)
+        .pipe(lambda df: df.pivot_table(
+            id_col, df.columns.drop(id_col).to_list(), aggfunc=lambda x: x
+        ))
+        .sort_index(axis=1, **sort_kws)
+        .squeeze(axis=1)
+        .rename(id_col)
     )
+    # broad.rename({broad.columns[0]: id_col}, axis=1, inplace=True)
+    return broad
 
-    # rank sort in place
-    if isinstance(rank_ascending, bool):
-        # check if value is actually a list
-        pivoted.insert(
-            0,
-            "_nrows",
-            pivoted[data.index.names[0]].apply(
-                lambda x: len(x) if isinstance(x, list) else 1
-            ),
-        )
-
-        # sort by rank
-        pivoted.sort_values("_nrows", ascending=rank_ascending)
-        pivoted.drop("_nrows", axis=1, inplace=True)
-
-    elif rank_ascending is not None:
-        raise ValueError("Bad value for 'rank_ascending'", rank_ascending)
-
-    # assign alias (with prefix)
-    if alias_prefix is None:
-        pivoted[alias_name] = range(len(pivoted))
-
-    else:
-        pad = len(str(len(pivoted)))
-        formatter = f"{alias_prefix}{{0:0{pad}d}}".format
-        pivoted[alias_name] = [formatter(x) for x in range(len(pivoted))]
-
-    # force one-member groups to be lists.
-    if force_lists:
-        pivoted.mask(
-            pivoted.notnull(),
-            pivoted.map(lambda x: x if isinstance(x, list) else [x]),
-            inplace=True,
-        )
-
-    # the deduplicated dataframe indexed by the alias
-    dedup = (
-        pivoted.set_index(alias_name, append=True)
-        .index.to_frame()
-        .droplevel(pivoted.index.names, axis=0)
-        .drop(alias_name, axis=1)
-    )
-
-    # re-format columns
-    if isinstance(pivoted.columns, pd.MultiIndex):
-        dedup.columns = pd.MultiIndex.from_tuples(
-            dedup.columns, names=pivoted.columns.names
-        )
-
-    xref = pivoted.set_index(alias_name)  # also drops the 'rows' index levels
-
-    return dedup, xref
-
-
-def dedup_alias(
-    data: pd.DataFrame,
-    value: Hashable,
-    id_col: Hashable,
-    columns: Hashable | Sequence[Hashable],
-    alias_name: str = "ALIAS",
-) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame]:
-    """Deduplicates and aliases entries (by 'id_col') with identical values
-
-    Returns
-    - pd.Series: id_xref with index ID_COL and values ALIAS
-    - pd.DataFrame: alias_xref with index ALIAS, columns COLUMNS, values value
-    - pd.DataFrame: aliased values with columns [*COLUMNS, ALIAS, value]
-    """
-
-    # - pd.DataFrame: alias xrefs with ["KEY", id_col, N_id_col]
-    if len(data) == 0:
-        xrefs = pd.DataFrame(columns=["KEY", id_col, f"N_{id_col}"])
-        aliased = pd.DataFrame(columns=[*columns, alias_name, value])
-
-    else:
-        pivoted = data.reset_index().pivot_table(
-            value, id_col, columns, aggfunc=lambda x: x
-        )
-
-        id_col_idx = pivoted.columns
-        groups = pivoted.reset_index().groupby(id_col_idx.to_list())
-
-        xrefs = (
-            pd.DataFrame(list(groups[id_col]), columns=["KEY", id_col])
-            .assign(**{f"N_{id_col}": lambda df: df[id_col].apply(len)})
-            .sort_values(
-                [f"N_{id_col}", "KEY"], ascending=[False, True], ignore_index=True
-            )
-            .rename_axis(alias_name)
-        )
-
-        aliased = (
-            pd.DataFrame.from_records(xrefs["KEY"], columns=id_col_idx)
-            .rename_axis(alias_name)
-            .melt(value_name=value, ignore_index=False)
-            .reset_index()
-            .pipe(reorder_cols, last=alias_name)
-        )
-    return xrefs, aliased
-    # return xrefs, aliased
 
 
 def get_level_uniques(
@@ -312,30 +332,144 @@ def pivot_indexed_table(df: pd.DataFrame, *args, **kwargs) -> pd.DataFrame:
 
     return pivoted
 
+def rank_sort(
+    data: pd.Series | pd.DataFrame,
+    func: Callable = None,
+    func_kws: dict = None,
+    keep_col: bool = False,
+    inplace: bool = False,
+    **sort_kws
+):
+    """Ranks data based on `func` and sorts based on rank metric and index
+
+    data: pd.Series | pd.DataFrame
+        Data with values to rank
+    func: Callable, optional
+        How to rank. function takes a row from `data` and returns a Hashable.
+        Default lambda x: 1 if isinstance(x, Hashable) else len(x)
+    keep: bool, optional
+        Keep computed "_rank" metric column. Default False.
+    inplace: bool, optional
+        Modify `data` inplace. Default False
+    func_kws: dict, optional
+        Kws to pass to func
+    sort_kws: dict, optional
+        passed to pandas `sort_values()` function. Note that values are sorted
+        by '_rank' first, followed by the other columns
+
+    Returns:
+    Rank-sorted pd.Series or pd.DataFrame or None
+        `data` as pd.Series if `data` is a pd.Series and `keep_col=False`.
+        Else if inplace=True, returns None
+        Else, `data` is returned as a pd.DataFrame.
+    """
+    if isinstance(data, pd.DataFrame) and "_rank" in data.columns:
+        raise ValueError("'_rank' cannot be a column in data." )
+
+    if inplace and keep_col and isinstance(data, pd.Series):
+        raise TypeError("Cannot modify pd.Series inplace if keep_col=True")
+
+    # TODO: need checks or explicit handling of weird datatypes
+
+    # set defaults
+    if func is None:
+        func = lambda x: 1 if isinstance(x, Hashable) else len(x)
+
+    # calculate rank values on which to sort
+    if func_kws is None:
+        func_kws = {}
+
+    if isinstance(data, pd.DataFrame):
+        func_kws["axis"] = 1
+
+    ranking_metric = data.apply(func, **func_kws).rename("_rank")
+
+    sort_kws = {"level": ["_rank", *data.index.names]} | sort_kws
+
+    if isinstance(data, pd.DataFrame):
+        if not inplace:
+            data = data.copy()
+
+        # insert ranking col into dataframe and sort
+        data.insert(0, "_rank", ranking_metric)
+        data.set_index("_rank", inplace=True, append=True)
+        data.sort_index(inplace=True, **sort_kws)
+
+        if not keep_col:
+            data.droplevel("_rank", inplace=True)
+
+        if not inplace:
+            return data
+
+    elif isinstance(data, pd.Series):
+
+        # put data and ranks together and sort
+        data_rank = (
+            pd.concat([ranking_metric, data], axis=1)
+            .set_index("_rank", append=True)
+            .sort_index(**sort_kws)
+        )
+
+        if inplace:
+            # generate hash where index corresponds to `data` index and
+            # values are the rank metric
+            rank_hash = pd.Series(range(len(data_rank)), index=data_rank.index)
+            data.sort_values(key=lambda x: rank_hash[x], inplace=True)
+
+        elif not keep_col:  # not inplace
+            return data_rank.droplevel("_rank")
+
+        else:
+            return data_rank
+
+
+
 
 def reorder_cols(
     df: pd.DataFrame,
     first: Hashable | Sequence[Hashable] | pd.Index | None = None,
     last: Hashable | Sequence[Hashable] | pd.Index | None = None,
     inplace: bool = False,
-    ascending: bool = None,
-    sort_kws: dict = None,
+    sort: bool = False,
+    key: Callable = None,
+    reverse: bool = None,
     errors: Annotated[str, "ignore", "warn", "raise"] = "ignore",
+    **kws
 ) -> pd.DataFrame | None:
     """Reorders columns of dataframe.
 
-    Arguments:
-        df: pd.DataFrame
-        first: column label, list of labels or pd.Index to put first
-        last: column label, list of labels or pd.Index to put last
-        inplace: bool, default False
-        ascending: bool, default None
-            how to sort remaining columns, where True is ascending, False is
-            descending, and None is not sorted
-        sort_kws: dict, default None
-            kwargs to pass to pd.DataFrame.sort_index() func
+    Parameters
+    ----------
+    df: pd.DataFrame
+    first: column label, list of labels or pd.Index to put first
+    last: column label, list of labels or pd.Index to put last
+    inplace: bool, default False
+        Note: this is deprecated. Use 'reverse' and 'key' kwargs
 
-    Returns: pd.DataFrame if inplace is False, else None.
+    sort: bool, optional
+        Sort middle columns. Default False.
+    key: Callable, optional
+        Sort middle cols by this. (passed to `sorted`). Default None
+    reverse: Callable, optional
+        passed to `sorted. Default None
+
+    **kws:
+
+    [Deprecated]:
+    
+    ascending: bool, default None
+        how to sort remaining columns, where True is ascending, False is
+        descending, and None is not sorted.
+
+    sort_kws: dict, default None
+        kwargs to pass to `sorted()` on middle columns. Use `reverse` and
+        `key`
+
+    Returns
+    -------
+    pd.DataFrame or None
+        None if inplace=True, else rearranged DataFrame
+        
     """
     # check input df object is not empty
     if len(df.columns) == 0:
@@ -345,43 +479,105 @@ def reorder_cols(
             logging.warning("Warning: Empty DataFrame")
         return df
 
+    # defaults
+    try:
+        assert key is None
+        key = kws["sort_kws"]["key"]
+    except (AssertionError, KeyError):
+        pass
+
+    try:
+        assert reverse is None
+        reverse = kws["sort_kws"].get(
+            "reverse", kws["sort_kws"].get("ascending"))
+    except (AssertionError, KeyError):
+        pass
+
+
     # check if first and last cols are in df (filter out ones that aren't)
     if first is None:
         first = []
     else:
-        if not isinstance(first, (pd.Index, MutableSequence)):
-            first = default(first, [], has_value=[first])
+        if isinstance(first, Hashable):
+            first = default(first, [], [first])
+        elif not isinstance(first, (pd.Index, MutableSequence)):
+            first = list(first)
+            first = default(first, [])
+
         first = check_if_exists(first, df.columns, errors=errors)
 
     if last is None:
         last = []
     else:
-        if not isinstance(last, (pd.Index, MutableSequence)):
-            last = default(last, [], has_value=[last])
+        if isinstance(last, Hashable):
+            last = default(last, [], [last])
+        elif not isinstance(last, (pd.Index, MutableSequence)):
+            last = list(last)
+            last = default(last, [])
+
         last = check_if_exists(last, df.columns, errors=errors)
 
     # list of other (unspecified) columns
-    mid = df.drop(first, axis=1).drop(last, axis=1)
+    mid = df.columns.drop([*first, *last])
 
-    if isinstance(ascending, bool):
-        mid = mid.sort_index(axis=1, ascending=ascending, **default(sort_kws, {}))
+    if sort:
+        mid = sorted(mid, key=key, reverse=reverse)
 
     if inplace:
-        # arrange and store a copy of left side before dropping below
-        left = pd.concat([df.loc[:, first], mid], axis=1)
 
-        # reverse to insert at 0 during .apply
-        left = left[list(reversed(left.columns))]
+        if len(last) > 0:
+            _reorder_right_inplace(df, last)
+        if len(first) > 0:
+            _reorder_left_inplace(df, first)
 
-        # drop left columns inplace
-        df.drop([*first, *mid.columns], axis=1, inplace=True)
-
-        # put left columns back into the df in the new order
-        left.apply(lambda col: df.insert(0, col.name, col))
+        if sort and len(mid) > 0:
+            _reorder_mid_inplace(df, mid, len(first))
 
     else:
-        # simply concat and return a new copy
-        return pd.concat([df.loc[:, first], mid, df.loc[:, last]], axis=1)
+        return pd.concat([df[first], df[mid], df[last]], axis=1)
+
+
+def _reorder_left_inplace(_df, _left: Sequence[Hashable]) -> None:
+    # store left side before dropping from df
+    left_df = _df[_left]
+
+    # drop left columns inplace
+    _df.drop(_left, axis=1, inplace=True)
+
+    # reverse to insert at 0
+    for label in reversed(_left):
+
+        # put columns back into the df in the new order
+        _df.insert(0, label, left_df[label])
+
+
+def _reorder_right_inplace(_df, _right: Sequence[Hashable]) -> None:
+    # store right side before dropping
+    right_df = _df[_right]
+
+    # drop right columns inplace
+    _df.drop(_right, axis=1, inplace=True)
+
+    # put columns back into the df in the new order
+    i = len(_df.columns)
+
+    for label in _right:
+        _df.insert(i, label, right_df[label])
+        i += 1
+
+
+def _reorder_mid_inplace(_df, _mid: Sequence[Hashable], _at: int) -> None:
+    # store right side before dropping
+    mid_df = _df[_mid]
+
+    # drop right columns inplace
+    _df.drop(_mid, axis=1, inplace=True)
+
+    # reverse to insert at _at
+    # put columns back into the df in the new order
+    for label in reversed(_mid):
+
+        _df.insert(_at, label, mid_df[label])
 
 
 def sort_levels(

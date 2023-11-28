@@ -232,7 +232,8 @@ def intervals2locs(
     if dropna:
         res.dropna(inplace=True)
     
-    return res if to_series else res.values.astype(int)
+    return res if to_series or isinstance(
+        intervals, pd.DataFrame) else res.values.astype(int)
 
 
 def setops_ranges(
