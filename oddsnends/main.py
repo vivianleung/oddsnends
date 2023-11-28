@@ -186,6 +186,8 @@ def defaults(*values: Any, **kwargs) -> Any:
     'hello'
     >>> defaults("hello", "world", has_value=lambda s: f"{s} and good night")
     'hello and good night'
+    >>> defaults(None, "hello, "world", has_value=lambda s: f"{s} and good night")
+    'hello'
     """
 
     # figure out what counts as a null value
@@ -204,14 +206,7 @@ def defaults(*values: Any, **kwargs) -> Any:
     except IndexError as error:
         raise TypeError("Must provide at least one value") from error
 
-    for val in values:
-        isnull = _isnull(val, null_values, empty=empty, do_raise=False)
-        if not isnull:
-            break
-
-    if isnull:  # reached the end
-        return val
-    else:
+    if not _isnull(val, null_values, empty=empty, do_raise=False):
         # value is not null, so return has_value
         try:
             has_value = kwargs["has_value"]
@@ -226,7 +221,13 @@ def defaults(*values: Any, **kwargs) -> Any:
         return has_value(
             val, *kwargs.get("func_args", []), **kwargs.get("func_kws", {})
         )
-
+    
+    else:
+        for val in values[1:]:
+            isnull = _isnull(val, null_values, empty=empty, do_raise=False)
+            if not isnull:
+                break
+        return val
 
 #%%
 # def length(obj: Any) -> int:
