@@ -18,10 +18,10 @@ __all__ = [
     "defaults",
     "isnull",
     "notnull",
-    # "length",
     "msg",
     "now",
     "parse_literal_eval",
+    "strjoin",
     "xor",
 ]
 
@@ -229,14 +229,6 @@ def defaults(*values: Any, **kwargs) -> Any:
                 break
         return val
 
-#%%
-# def length(obj: Any) -> int:
-#     """Returns length of 'obj', handling Hashables and None values"""
-#     if isinstance(obj, Collection) and not isinstance(obj, Hashable):
-#         return len(obj)
-#     elif isnull(obj):
-#         return 0
-#     return 1
 
 def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:
     """Writes message to stream"""
@@ -257,6 +249,10 @@ def parse_literal_eval(val: str) -> Any:
     except (ValueError, TypeError, SyntaxError, MemoryError):
         return val
 
+def strjoin(*values: Any, sep: str = "") -> str:
+    """Joins values of any type, converting to str"""
+    return sep.join(str(v) for v in values)
+    
 
 def xor(
     expr1: bool | Sequence[bool], expr2: bool | Sequence[bool]
