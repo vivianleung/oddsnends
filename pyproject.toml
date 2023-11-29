@@ -38,9 +38,9 @@ include = [
 
 [tool.hatch.build.conda]
 channels = ["vivianleung"]
-directory = "./conda_build"
+directory = "/conda_build"
 patches = [
-    "0001-fixed-bug-assertfile-exists-handling-None-paths.patch"
+    "/conda_build/0001-patch_for_ioa.patch"
 ]
 
 [tool.pytest]
