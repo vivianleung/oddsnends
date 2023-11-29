@@ -1,8 +1,6 @@
 channels:
 - conda-forge
 dependencies:
-- build
-- bump2version
 - coverage
 - flake8
 - ipykernel
@@ -13,11 +11,11 @@ dependencies:
 - Sphinx
 - tox
 - toml
-- twine
+- tomli
 - watchdog
-- wheel>=0.38.1
-- hatch
-- hatch-requirements-txt
 - pytest
 - pytest-cov
 - doctest
+- hatchling
+- hatch-requirements-txt
+
