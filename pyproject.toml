@@ -9,7 +9,7 @@ build-backend = "hatchling.build"
 [project]
 name = "oddsnends"
 
-version = "0.2.2.dev0"
+version = "0.2.2"
 dynamic = ["dependencies", "optional-dependencies"]
 
 description = "Miscellaneous (odds 'n ends) methods for data science"
