@@ -84,6 +84,7 @@ def argtype_filepath(parser: ArgumentParser, arg: str | None, follow_symlinks: b
         
     except (AssertionError, TypeError) as error:
         parser.error(f"File not found: {arg} (realpath {fpath})")
+    return fpath
 
 
 def find_fpaths(

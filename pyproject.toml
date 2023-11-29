@@ -36,6 +36,12 @@ include = [
 "Homepage" = "https://github.com/vivianleung/oddsnends"
 "Bug Tracker" = "https://github.com/vivianleung/oddsnends/issues"
 
+[tool.hatch.build.conda]
+channels = ["vivianleung"]
+directory = "./conda_build"
+patches = [
+    "0001-fixed-bug-assertfile-exists-handling-None-paths.patch"
+]
 
 [tool.pytest]
 addopts = ["--doctest-modules"]
