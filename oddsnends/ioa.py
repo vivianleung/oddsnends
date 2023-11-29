@@ -40,41 +40,38 @@ class SmartFormatter(ArgumentDefaultsHelpFormatter):
 
 
 
-def assertfile(filepath: str | None, *err_args,
+def assertfile(path: str | None, *err_args,
                null: Annotated[str, "ignore", "raise"] = "ignore",
                follow_symlinks: bool = True) -> None:
     """Asserts isfile. Raises FileNotFoundError only if fpath is non-null."""
     
-    fpath = os.path.realpath(filepath) if follow_symlinks else filepath
-    try:
-        assert os.path.isfile(fpath), fpath
-        
-    except AssertionError as error:
-        raise FileNotFoundError(filepath, f"(realpath: {fpath}") from error
+    if path is not None:
+        try:
+            fpath = os.path.realpath(path) if follow_symlinks else path
+            assert os.path.isfile(fpath), fpath
+            
+        except AssertionError as error:
+            raise FileNotFoundError(path, f"(realpath: {fpath}") from error
     
-    except TypeError as error:
-        if (fpath is not None) or (null == "raise"):
-            raise TypeError(filepath, type(filepath)) from error
+    elif null != "ignore":
+        raise TypeError("No path given.")
 
-
-def assertexists(
-    filepath: str | None, *err_args,
-    null: Annotated[str, "ignore", "raise"] = "ignore",
-    follow_symlinks: bool = True,
-) -> None:
+def assertexists(path: str | None, *err_args,
+               null: Annotated[str, "ignore", "raise"] = "ignore",
+               follow_symlinks: bool = True) -> None:
     """Asserts exists. Raises FileNotFoundError only if fpath is non-null."""
     
-    fpath = os.path.realpath(filepath) if follow_symlinks else filepath
-    try:
-        assert os.path.exists(fpath), fpath
-        
-        assert os.path.exists(fpath)
-    except AssertionError as error:
-        raise FileNotFoundError(filepath, f"(realpath: {fpath}") from error
+    if path is not None:
+        try:
+            fpath = os.path.realpath(path) if follow_symlinks else path
+            assert os.path.isexists(fpath), fpath
+            
+        except AssertionError as error:
+            raise FileNotFoundError(path, f"(realpath: {fpath}") from error
+    
+    elif null != "ignore":
+        raise TypeError("No path given.")
 
-    except TypeError as error:
-        if (fpath is not None) or (null == "raise"):
-            raise TypeError(fpath, type(fpath)) from error
 
 def argtype_filepath(parser: ArgumentParser, arg: str | None, follow_symlinks: bool = True) -> str:
     """Check if arg given to parser is a valid file, raising ArgumentError
