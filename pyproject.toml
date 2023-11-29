@@ -3,14 +3,12 @@ requires = [
   "hatchling",
   "hatch-requirements-txt"
 ]
-build-backend = "hatchling.build"
 
+build-backend = "hatchling.build"
 
 [project]
 name = "oddsnends"
-
-version = "0.2.3"
-dynamic = ["dependencies", "optional-dependencies"]
+dynamic = ["dependencies", "optional-dependencies", "version"]
 
 description = "Miscellaneous (odds 'n ends) methods for data science"
 readme = "README.rst"
@@ -23,11 +21,20 @@ authors = [
 
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 
 keywords = ["oddsnends"]
+
+[tool.hatch.metadata]
+build = 0
+
+[tool.hatch.version]
+path = "VERSION"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -36,12 +43,26 @@ include = [
 "Homepage" = "https://github.com/vivianleung/oddsnends"
 "Bug Tracker" = "https://github.com/vivianleung/oddsnends/issues"
 
+# [tool.hatch.envs.oddsnends]
+# type = "conda"
+# command = "conda"
+# conda-forge = true
+# environment-file = "environment.yml"
+
+[tool.hatch.envs.build]
+type = "conda"
+command = "conda"
+conda-forge = true
+environment-file = "environment_build.yml"
+
 [tool.hatch.build.conda]
 channels = ["vivianleung"]
-directory = "/conda_build"
-patches = [
-    "/conda_build/0001-patch_for_ioa.patch"
-]
+directory = "conda_build"
+environment = "build"
+
+# patches = [
+#     # "/conda_build/0001-patch_for_ioa.patch"
+# ]
 
 [tool.pytest]
 addopts = ["--doctest-modules"]

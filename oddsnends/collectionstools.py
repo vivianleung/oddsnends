@@ -18,7 +18,6 @@ __all__ = [
     "strictcollection",
 ]
 
-
 class AttrDict(dict):
     """Convenient way to store and access dict as attributes"""
     def __init__(self, **kws):

@@ -1,13 +1,25 @@
 channels:
 - conda-forge
 dependencies:
-- hatch
+- python
+- pip>=23.3
+- hatchling
 - hatch-requirements-txt
+- watchdog
 - twine
 # for conda
 - conda-build
+- Sphinx
+- tox
+- toml
+- tomli
 - anaconda-client
 # for py
 - build
 - wheel>=0.38.1
 - coverage
+- flake8
+- pyright
+- pytest
+- pytest-cov
+- doctest

@@ -57,8 +57,8 @@ def assertfile(path: str | None, *err_args,
         raise TypeError("No path given.")
 
 def assertexists(path: str | None, *err_args,
-               null: Annotated[str, "ignore", "raise"] = "ignore",
-               follow_symlinks: bool = True) -> None:
+                 null: Annotated[str, "ignore", "raise"] = "ignore",
+                 follow_symlinks: bool = True) -> None:
     """Asserts exists. Raises FileNotFoundError only if fpath is non-null."""
     
     if path is not None:
