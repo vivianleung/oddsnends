@@ -76,6 +76,9 @@ def assertexists(path: str | None, *err_args,
 def argtype_filepath(parser: ArgumentParser, arg: str | None, follow_symlinks: bool = True) -> str:
     """Check if arg given to parser is a valid file, raising ArgumentError
     otherwise
+    
+    Include in parser.add_argument as:
+        parser.add_argument(..., type=lambda x: argtype_filepath(parser, x))
     """
     fpath = os.path.realpath(arg.strip()) if follow_symlinks else arg.strip()
 

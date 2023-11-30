@@ -33,6 +33,7 @@ keywords = ["oddsnends"]
 [tool.hatch.metadata]
 build = 0
 
+
 [tool.hatch.version]
 path = "VERSION"
 
@@ -59,6 +60,7 @@ environment-file = "environment_build.yml"
 channels = ["vivianleung"]
 directory = "conda_build"
 environment = "build"
+
 
 # patches = [
 #     # "/conda_build/0001-patch_for_ioa.patch"
