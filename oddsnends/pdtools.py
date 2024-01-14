@@ -272,7 +272,7 @@ def get_level_uniques(
 def ordered_fillna(
     df: pd.DataFrame,
     label: Hashable,
-    order: Hashable | Sequence[Hashable],
+    values: Hashable | Sequence[Hashable],
     inplace: bool = False,
 ) -> pd.DataFrame | None:
     """Progressive fillna according to an ordered `order` list
@@ -281,8 +281,9 @@ def ordered_fillna(
         DataFrame must contain columns in `order`
     label:  Hashable
         Column label to fill, either existing or new. Default "name"
-    order : Hashable or sequence of Hashables
-        Field or ordered list of fields by which to populate the column
+    values : Hashable or sequence of Hashables
+        field, pd.Series pd.DataFrame, or ordered list of fields and/or 
+        pd.Series in df by which to populate the column
     inplace: bool, optional
         Do inplace
 
@@ -290,18 +291,31 @@ def ordered_fillna(
     pd.DataFrame or None
     """
     # get order priority
-    if isinstance(order, Hashable):
-        order = [order]
+    if isinstance(values, Hashable):
+        values = [values]
 
     if not inplace:
         df = df.copy()
 
     # set 'name' field
     if label not in df:
-        df[label] = df[order[0]]
+        df[label] = df[values[0]]
 
-    for field in order:
-        df[label].fillna(field, inplace=True)
+    # fill in according to type of `order` value provided`
+    if isinstance(values, Hashable):  # field
+        df[label].fillna(df[values], inplace=True)
+    
+    elif isinstance(values, pd.Series):
+        df[label].fillna(values, inplace=True)
+    
+    elif isinstance(values, pd.DataFrame):
+        for col in values:
+            df[label].fillna(values[col], inplace=True)
+    
+    else:  # list of fields or pd.Series of values
+        for field in values:
+            val = df[field] if isinstance(field, Hashable) else field
+            df[label].fillna(val, inplace=True)
 
     if not inplace:
         return df
