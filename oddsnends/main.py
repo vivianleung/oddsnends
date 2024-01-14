@@ -20,6 +20,7 @@ __all__ = [
     "notnull",
     "msg",
     "now",
+    "nprint",
     "parse_literal_eval",
     "strjoin",
     "xor",
@@ -44,6 +45,51 @@ class OptionsMetaType(type):
     def __new__(mcs, name: str, bases: tuple, attrs: dict):
         return super().__new__(mcs, name, bases, attrs)
 
+
+
+def _isnull(
+    x: Any,
+    null_values: Collection[Any] = None,
+    empty: bool = True,
+    do_raise: bool = False,
+) -> bool:
+    """Default null_values is [None, nan]"""
+
+    if null_values is None:
+        null_values = [None, nan]
+
+    try:
+        if hasattr(x, "__len__") and empty:
+            assert len(x) > 0
+
+        if isinstance(x, NDFrame):
+            raise TypeError("Cannot check values in NDFrames", x)
+
+        for n in null_values:  # "nan is nan" returns True but nan != nan
+            assert (x != n) and (x is not n)
+
+    except AssertionError as error:
+        if do_raise:
+            raise error
+        return True
+
+    return False
+
+
+def _notnull(
+    x: Any,
+    null_values: Collection[Any] = None,
+    empty: bool = True,
+    do_raise: bool = False,
+) -> bool:
+    """Wrapper for _isnull"""
+    return not _isnull(x, null_values=null_values, empty=empty, do_raise=do_raise)
+
+# aliases
+isnull = _isnull
+notnull = _notnull
+
+# Functions
 
 def default(
     x: Any,
@@ -99,48 +145,6 @@ def default(
     else:
         return has_value
 
-
-def _isnull(
-    x: Any,
-    null_values: Collection[Any] = None,
-    empty: bool = True,
-    do_raise: bool = False,
-) -> bool:
-    """Default null_values is [None, nan]"""
-
-    if null_values is None:
-        null_values = [None, nan]
-
-    try:
-        if hasattr(x, "__len__") and empty:
-            assert len(x) > 0
-
-        if isinstance(x, NDFrame):
-            raise TypeError("Cannot check values in NDFrames", x)
-
-        for n in null_values:  # "nan is nan" returns True but nan != nan
-            assert (x != n) and (x is not n)
-
-    except AssertionError as error:
-        if do_raise:
-            raise error
-        return True
-
-    return False
-
-
-def _notnull(
-    x: Any,
-    null_values: Collection[Any] = None,
-    empty: bool = True,
-    do_raise: bool = False,
-) -> bool:
-    """Wrapper for _isnull"""
-    return not _isnull(x, null_values=null_values, empty=empty, do_raise=do_raise)
-
-
-isnull = _isnull
-notnull = _notnull
 
 
 def defaults(*values: Any, **kwargs) -> Any:
@@ -241,6 +245,9 @@ def now(fmt: str = "%c") -> str:
     """Get and format current datetime"""
     return datetime.datetime.now().strftime(fmt)
 
+def nprint(*args, sep='\n', **kws) -> None:
+    """Print with sep as newline"""
+    print(*args, sep=sep, **kws)
 
 def parse_literal_eval(val: str) -> Any:
     """Wrapper for ast.literal_eval, returning val if malformed input"""
