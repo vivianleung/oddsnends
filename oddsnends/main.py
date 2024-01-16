@@ -16,6 +16,7 @@ __all__ = [
     "OptionsMetaType",
     "default",
     "defaults",
+    "flatten",
     "isnull",
     "notnull",
     "msg",
