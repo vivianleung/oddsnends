@@ -181,17 +181,17 @@ def defaults(*values: Any, **kwargs) -> Any:
     1
     >>> defaults(None, 1, None)
     1
-    >>> defaults("", 1, empty=True)
+    >>> defaults('', 1, empty=True)
     1
-    >>> defaults("", 1, empty=False)
+    >>> defaults('', 1, empty=False)
     ''
-    >>> defaults("", "foo", "bar", "baz", null_values=[None, nan, "foo"])
+    >>> defaults('', 'foo', 'bar', 'baz', null_values=[None, nan, 'foo'])
     'bar'
-    >>> defaults("hello", "world")
+    >>> defaults('hello', 'world')
     'hello'
-    >>> defaults("hello", "world", has_value=lambda s: f"{s} and good night")
+    >>> defaults('hello', 'world', has_value=lambda s: f'{s} and good night')
     'hello and good night'
-    >>> defaults(None, "hello, "world", has_value=lambda s: f"{s} and good night")
+    >>> defaults(None, 'hello', 'world', has_value=lambda s: f'{s} and good night')
     'hello'
     """
 
@@ -235,33 +235,60 @@ def defaults(*values: Any, **kwargs) -> Any:
         return val
 
 
-def flatten(*values, force: bool = True) -> list[Hashable]:
-    """Flattens mixture of single and lists of values into a single list
-
-    Tuples are optionally flattened into individual elements and collections
-    are expanded into their individual elements.
+def flatten(values, force: bool = True) -> list[Hashable]:
+    """Recursively flattens a mixture of single and lists of values into a
+    single list, optionally flattening tuples
 
     Parameters
     ----------
+    values : Any
+        A list of single and/or list-like elements to flatten
     force : bool, optional
-        The `force` parameter is a boolean flag that determines whether or not
-        to flatten tuples. If `force` is set to `True`, tuples will be
-        flattened. If `force` is set to `False`, tuples will not be flattened
-        and will be treated as single values.
+        Determines whether to flatten tuples. If `force` is set to `True`
+        the function will recursively flatten tuples. If `False`, tuples
+        will be preserved.
 
     Returns
     -------
-        The function `flatten` returns a list of hashable values.
+        The function `flatten` returns a flattened list of hashable values.
+
+    Examples
+    --------
+    >>> flatten([])
+    []
+    >>> flatten('hi')
+    ['hi']
+    >>> flatten([1, ('hi', 'world')])
+    [1, 'hi', 'world']
+    >>> flatten([1, ('hi', 'world')], force=False)
+    [1, ('hi', 'world')]
+    >>> flatten([['hello', 'big', 'world'], 'good', 'night'])
+    ['hello', 'big', 'world', 'good', 'night']
     """
-    flattened = []
-    for val in values:
-        if isinstance(val, tuple) and force:  # flatten the tuple
-            flattened.extend(list(val))
-        elif not isinstance(val, Hashable):  # a collection
-            flattened.extend(val)
-        else:  # single value
-            flattened.append(val)
-    return flattened
+
+    def _nice_hashable(_val) -> bool:
+        return isinstance(_val, Hashable) or (isinstance(_val, tuple) and not force)
+
+    # single item
+    if (
+        isinstance(values, str)                       # is a string
+        or (not isinstance(values, Collection))       # can't flatten
+        or (isinstance(values, tuple) and not force)  # don't flatten tuple
+    ):
+        return [values]
+
+    # empty lists
+    if len(values) == 0:
+        return values
+
+    # recursively flatten both
+    if (not isinstance(values[0], Hashable)) or (
+        isinstance(values[0], tuple) and force
+    ):
+        return flatten(list(values[0]), force=force) + flatten(values[1:], force=force)
+
+    # flatten remaining values
+    return [values[0]] + flatten(values[1:], force=force)
 
 
 def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:
@@ -289,7 +316,9 @@ def parse_literal_eval(val: str) -> Any:
         return val
 
 
-def strjoin(*values: Any, sep: str = "", force: bool = True) -> str:
+def strjoin(
+    *values: Any, sep: str = "", recursive: bool = False, force: bool = True
+) -> str:
     """Joins values of any type into a single string, converting
     them to strings if necessary, using a specified separator.
 
@@ -299,14 +328,17 @@ def strjoin(*values: Any, sep: str = "", force: bool = True) -> str:
         Values to concatenate
     sep : str
         Separator to be used when joining the values together. Default ''
+    recursive: bool, optional
+        Recursively flatten and join elements. See flatten()
     force : bool, optional
-        Flatten tuples when joining. See flatten()
+        If recursive is `True`, also flatten tuples. See flatten().
 
     Returns
     -------
         Concatenated string
     """
-    return sep.join(str(v) for v in flatten(*values, force=force))
+    to_concat = flatten(values, force=force) if recursive else values
+    return sep.join(str(v) for v in to_concat)
 
 
 def xor(
