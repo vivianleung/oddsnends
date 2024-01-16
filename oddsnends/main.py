@@ -262,6 +262,8 @@ def flatten(values, force: bool = True) -> list[Hashable]:
     [1, 'hi', 'world']
     >>> flatten([1, ('hi', 'world')], force=False)
     [1, ('hi', 'world')]
+    >>> flatten([('hi', 'world'), 1], force=False)
+    [('hi', 'world'), 1]
     >>> flatten([['hello', 'big', 'world'], 'good', 'night'])
     ['hello', 'big', 'world', 'good', 'night']
     """
@@ -285,10 +287,10 @@ def flatten(values, force: bool = True) -> list[Hashable]:
     if (not isinstance(values[0], Hashable)) or (
         isinstance(values[0], tuple) and force
     ):
-        return flatten(list(values[0]), force=force) + flatten(values[1:], force=force)
+        return [*flatten(list(values[0]), force=force), *flatten(values[1:], force=force)]
 
     # flatten remaining values
-    return [values[0]] + flatten(values[1:], force=force)
+    return [values[0], *flatten(values[1:], force=force)]
 
 
 def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:
