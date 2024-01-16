@@ -16,10 +16,12 @@ __all__ = [
     "OptionsMetaType",
     "default",
     "defaults",
+    "flatten",
     "isnull",
     "notnull",
     "msg",
     "now",
+    "nprint",
     "parse_literal_eval",
     "strjoin",
     "xor",
@@ -43,6 +45,52 @@ class OptionsMetaType(type):
 
     def __new__(mcs, name: str, bases: tuple, attrs: dict):
         return super().__new__(mcs, name, bases, attrs)
+
+
+def _isnull(
+    x: Any,
+    null_values: Collection[Any] = None,
+    empty: bool = True,
+    do_raise: bool = False,
+) -> bool:
+    """Default null_values is [None, nan]"""
+
+    if null_values is None:
+        null_values = [None, nan]
+
+    try:
+        if hasattr(x, "__len__") and empty:
+            assert len(x) > 0
+
+        if isinstance(x, NDFrame):
+            raise TypeError("Cannot check values in NDFrames", x)
+
+        for n in null_values:  # "nan is nan" returns True but nan != nan
+            assert (x != n) and (x is not n)
+
+    except AssertionError as error:
+        if do_raise:
+            raise error
+        return True
+
+    return False
+
+
+def _notnull(
+    x: Any,
+    null_values: Collection[Any] = None,
+    empty: bool = True,
+    do_raise: bool = False,
+) -> bool:
+    """Wrapper for _isnull"""
+    return not _isnull(x, null_values=null_values, empty=empty, do_raise=do_raise)
+
+
+# aliases
+isnull = _isnull
+notnull = _notnull
+
+# Functions
 
 
 def default(
@@ -100,49 +148,6 @@ def default(
         return has_value
 
 
-def _isnull(
-    x: Any,
-    null_values: Collection[Any] = None,
-    empty: bool = True,
-    do_raise: bool = False,
-) -> bool:
-    """Default null_values is [None, nan]"""
-
-    if null_values is None:
-        null_values = [None, nan]
-
-    try:
-        if hasattr(x, "__len__") and empty:
-            assert len(x) > 0
-
-        if isinstance(x, NDFrame):
-            raise TypeError("Cannot check values in NDFrames", x)
-
-        for n in null_values:  # "nan is nan" returns True but nan != nan
-            assert (x != n) and (x is not n)
-
-    except AssertionError as error:
-        if do_raise:
-            raise error
-        return True
-
-    return False
-
-
-def _notnull(
-    x: Any,
-    null_values: Collection[Any] = None,
-    empty: bool = True,
-    do_raise: bool = False,
-) -> bool:
-    """Wrapper for _isnull"""
-    return not _isnull(x, null_values=null_values, empty=empty, do_raise=do_raise)
-
-
-isnull = _isnull
-notnull = _notnull
-
-
 def defaults(*values: Any, **kwargs) -> Any:
     """Returns value (via. has value) or first non-null default value
 
@@ -176,17 +181,17 @@ def defaults(*values: Any, **kwargs) -> Any:
     1
     >>> defaults(None, 1, None)
     1
-    >>> defaults("", 1, empty=True)
+    >>> defaults('', 1, empty=True)
     1
-    >>> defaults("", 1, empty=False)
+    >>> defaults('', 1, empty=False)
     ''
-    >>> defaults("", "foo", "bar", "baz", null_values=[None, nan, "foo"])
+    >>> defaults('', 'foo', 'bar', 'baz', null_values=[None, nan, 'foo'])
     'bar'
-    >>> defaults("hello", "world")
+    >>> defaults('hello', 'world')
     'hello'
-    >>> defaults("hello", "world", has_value=lambda s: f"{s} and good night")
+    >>> defaults('hello', 'world', has_value=lambda s: f'{s} and good night')
     'hello and good night'
-    >>> defaults(None, "hello, "world", has_value=lambda s: f"{s} and good night")
+    >>> defaults(None, 'hello', 'world', has_value=lambda s: f'{s} and good night')
     'hello'
     """
 
@@ -221,13 +226,69 @@ def defaults(*values: Any, **kwargs) -> Any:
         return has_value(
             val, *kwargs.get("func_args", []), **kwargs.get("func_kws", {})
         )
-    
+
     else:
         for val in values[1:]:
             isnull = _isnull(val, null_values, empty=empty, do_raise=False)
             if not isnull:
                 break
         return val
+
+
+def flatten(values, force: bool = True) -> list[Hashable]:
+    """Recursively flattens a mixture of single and lists of values into a
+    single list, optionally flattening tuples
+
+    Parameters
+    ----------
+    values : Any
+        A list of single and/or list-like elements to flatten
+    force : bool, optional
+        Determines whether to flatten tuples. If `force` is set to `True`
+        the function will recursively flatten tuples. If `False`, tuples
+        will be preserved.
+
+    Returns
+    -------
+        The function `flatten` returns a flattened list of hashable values.
+
+    Examples
+    --------
+    >>> flatten([])
+    []
+    >>> flatten('hi')
+    ['hi']
+    >>> flatten([1, ('hi', 'world')])
+    [1, 'hi', 'world']
+    >>> flatten([1, ('hi', 'world')], force=False)
+    [1, ('hi', 'world')]
+    >>> flatten([['hello', 'big', 'world'], 'good', 'night'])
+    ['hello', 'big', 'world', 'good', 'night']
+    """
+
+    def _nice_hashable(_val) -> bool:
+        return isinstance(_val, Hashable) or (isinstance(_val, tuple) and not force)
+
+    # single item
+    if (
+        isinstance(values, str)                       # is a string
+        or (not isinstance(values, Collection))       # can't flatten
+        or (isinstance(values, tuple) and not force)  # don't flatten tuple
+    ):
+        return [values]
+
+    # empty lists
+    if len(values) == 0:
+        return values
+
+    # recursively flatten both
+    if (not isinstance(values[0], Hashable)) or (
+        isinstance(values[0], tuple) and force
+    ):
+        return flatten(list(values[0]), force=force) + flatten(values[1:], force=force)
+
+    # flatten remaining values
+    return [values[0]] + flatten(values[1:], force=force)
 
 
 def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:
@@ -242,6 +303,11 @@ def now(fmt: str = "%c") -> str:
     return datetime.datetime.now().strftime(fmt)
 
 
+def nprint(*args, sep="\n", **kws) -> None:
+    """Print with sep as newline"""
+    print(*args, sep=sep, **kws)
+
+
 def parse_literal_eval(val: str) -> Any:
     """Wrapper for ast.literal_eval, returning val if malformed input"""
     try:
@@ -249,10 +315,31 @@ def parse_literal_eval(val: str) -> Any:
     except (ValueError, TypeError, SyntaxError, MemoryError):
         return val
 
-def strjoin(*values: Any, sep: str = "") -> str:
-    """Joins values of any type, converting to str"""
-    return sep.join(str(v) for v in values)
-    
+
+def strjoin(
+    *values: Any, sep: str = "", recursive: bool = False, force: bool = True
+) -> str:
+    """Joins values of any type into a single string, converting
+    them to strings if necessary, using a specified separator.
+
+    Parameters
+    ----------
+    *values : Any
+        Values to concatenate
+    sep : str
+        Separator to be used when joining the values together. Default ''
+    recursive: bool, optional
+        Recursively flatten and join elements. See flatten()
+    force : bool, optional
+        If recursive is `True`, also flatten tuples. See flatten().
+
+    Returns
+    -------
+        Concatenated string
+    """
+    to_concat = flatten(values, force=force) if recursive else values
+    return sep.join(str(v) for v in to_concat)
+
 
 def xor(
     expr1: bool | Sequence[bool], expr2: bool | Sequence[bool]
