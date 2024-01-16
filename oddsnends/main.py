@@ -233,24 +233,25 @@ def defaults(*values: Any, **kwargs) -> Any:
                 break
         return val
 
+
 def flatten(*values, force: bool = True) -> list[Hashable]:
-    '''Flattens mixture of single and lists of values into a single list
-    
-    Tuples are optionally flattened into individual elements and collections 
+    """Flattens mixture of single and lists of values into a single list
+
+    Tuples are optionally flattened into individual elements and collections
     are expanded into their individual elements.
-    
+
     Parameters
     ----------
     force : bool, optional
-        The `force` parameter is a boolean flag that determines whether or not 
-        to flatten tuples. If `force` is set to `True`, tuples will be 
-        flattened. If `force` is set to `False`, tuples will not be flattened 
+        The `force` parameter is a boolean flag that determines whether or not
+        to flatten tuples. If `force` is set to `True`, tuples will be
+        flattened. If `force` is set to `False`, tuples will not be flattened
         and will be treated as single values.
-    
+
     Returns
     -------
         The function `flatten` returns a list of hashable values.
-    '''
+    """
     flattened = []
     for val in values:
         if isinstance(val, tuple) and force:  # flatten the tuple
@@ -260,6 +261,7 @@ def flatten(*values, force: bool = True) -> list[Hashable]:
         else:  # single value
             flattened.append(val)
     return flattened
+
 
 def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:
     """Writes message to stream"""
@@ -286,9 +288,24 @@ def parse_literal_eval(val: str) -> Any:
         return val
 
 
-def strjoin(*values: Any, sep: str = "") -> str:
-    """Joins values of any type, converting to str"""
-    return sep.join(str(v) for v in values)
+def strjoin(*values: Any, sep: str = "", force: bool = True) -> str:
+    """Joins values of any type into a single string, converting
+    them to strings if necessary, using a specified separator.
+
+    Parameters
+    ----------
+    *values : Any
+        Values to concatenate
+    sep : str
+        Separator to be used when joining the values together. Default ''
+    force : bool, optional
+        Flatten tuples when joining. See flatten()
+
+    Returns
+    -------
+        Concatenated string
+    """
+    return sep.join(str(v) for v in flatten(*values, force=force))
 
 
 def xor(
