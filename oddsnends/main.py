@@ -46,7 +46,6 @@ class OptionsMetaType(type):
         return super().__new__(mcs, name, bases, attrs)
 
 
-
 def _isnull(
     x: Any,
     null_values: Collection[Any] = None,
@@ -85,11 +84,13 @@ def _notnull(
     """Wrapper for _isnull"""
     return not _isnull(x, null_values=null_values, empty=empty, do_raise=do_raise)
 
+
 # aliases
 isnull = _isnull
 notnull = _notnull
 
 # Functions
+
 
 def default(
     x: Any,
@@ -144,7 +145,6 @@ def default(
 
     else:
         return has_value
-
 
 
 def defaults(*values: Any, **kwargs) -> Any:
@@ -225,7 +225,7 @@ def defaults(*values: Any, **kwargs) -> Any:
         return has_value(
             val, *kwargs.get("func_args", []), **kwargs.get("func_kws", {})
         )
-    
+
     else:
         for val in values[1:]:
             isnull = _isnull(val, null_values, empty=empty, do_raise=False)
@@ -233,6 +233,33 @@ def defaults(*values: Any, **kwargs) -> Any:
                 break
         return val
 
+def flatten(*values, force: bool = True) -> list[Hashable]:
+    '''Flattens mixture of single and lists of values into a single list
+    
+    Tuples are optionally flattened into individual elements and collections 
+    are expanded into their individual elements.
+    
+    Parameters
+    ----------
+    force : bool, optional
+        The `force` parameter is a boolean flag that determines whether or not 
+        to flatten tuples. If `force` is set to `True`, tuples will be 
+        flattened. If `force` is set to `False`, tuples will not be flattened 
+        and will be treated as single values.
+    
+    Returns
+    -------
+        The function `flatten` returns a list of hashable values.
+    '''
+    flattened = []
+    for val in values:
+        if isinstance(val, tuple) and force:  # flatten the tuple
+            flattened.extend(list(val))
+        elif not isinstance(val, Hashable):  # a collection
+            flattened.extend(val)
+        else:  # single value
+            flattened.append(val)
+    return flattened
 
 def msg(*args, stream=sys.stdout, sep=" ", end="\n", flush=True) -> None:
     """Writes message to stream"""
@@ -245,9 +272,11 @@ def now(fmt: str = "%c") -> str:
     """Get and format current datetime"""
     return datetime.datetime.now().strftime(fmt)
 
-def nprint(*args, sep='\n', **kws) -> None:
+
+def nprint(*args, sep="\n", **kws) -> None:
     """Print with sep as newline"""
     print(*args, sep=sep, **kws)
+
 
 def parse_literal_eval(val: str) -> Any:
     """Wrapper for ast.literal_eval, returning val if malformed input"""
@@ -256,10 +285,11 @@ def parse_literal_eval(val: str) -> Any:
     except (ValueError, TypeError, SyntaxError, MemoryError):
         return val
 
+
 def strjoin(*values: Any, sep: str = "") -> str:
     """Joins values of any type, converting to str"""
     return sep.join(str(v) for v in values)
-    
+
 
 def xor(
     expr1: bool | Sequence[bool], expr2: bool | Sequence[bool]
