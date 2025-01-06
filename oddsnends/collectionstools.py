@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 import itertools
-from collections.abc import Collection, Hashable
+from collections import defaultdict
+from collections.abc import Collection, Hashable, Iterable, Mapping
 from typing import Any
 
 from pandas import notnull
 
 __all__ = [
     "AttrDict",
+    "DefaultDictPlus",
     "agg",
     "dict2list",
     "drop_duplicates",
@@ -32,6 +34,62 @@ class AttrDict(dict):
 
     def __delattr__(self, attr: Hashable) -> None:
         return self.__delitem__(attr)
+
+class DefaultDictPlus(defaultdict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def setdefault(self, __key: Hashable | Iterable[Hashable], *args) -> None:
+        if isinstance(__key, Hashable):
+            super().setdefault(__key, *args)
+        else:
+            for k in __key:
+                super().setdefault(k, *args)
+
+    def pop(self, key: Hashable | Iterable[Hashable], *args):
+        if isinstance(key, Hashable):
+            return super().pop(key, *args)
+        else:
+            vals = []
+            for k in key:
+                vals.append(super().pop(k, *args))
+            return vals
+
+    def popitem(self, key: Hashable | Iterable[Hashable], *args):
+        if isinstance(key, Hashable):
+            return super().popitem(key, *args)
+        else:
+            vals = []
+            for k in key:
+                vals.append(super().popitem(k, *args))
+            return vals
+
+    def setdefault(self, key: Hashable | Iterable[Hashable], *default) -> None:
+        if isinstance(key, Hashable):
+            key = [key]
+        if default:
+            for k in key:
+                super().setdefault(k, *default)
+        elif self.default_factory:
+            for k in key:
+                super().setdefault(k, self.default_factory())
+        else:
+            for k in key:
+                super().setdefault(k)
+
+    def update(self, ele, *args, **kws):
+        """kws take 'val' for default value. Specify explicitly with kws if value
+        is a mapping."""
+        if isinstance(ele, Mapping):
+            super().update(ele)
+        elif "val" in kws:
+            super().update({k: kws["val"] for k in ele}, *args)
+        elif len(args) == 0:
+            super().update(ele, **kws)
+        elif isinstance(args[0], Hashable):
+            super().update({k: args[0] for k in ele}, *args[1:], **kws)
+        else:
+            super().update(ele, *args, **kws)
 
 
 def agg(*args):
@@ -89,10 +147,7 @@ def pops(dct: dict, *keys, **kws) -> list[Any]:
 
 
 def simplify(value: Any) -> Any:
-    """Simplify value to a single value, if collection has only one value
-    
-    
-    """
+    """Simplify value to a single value, if collection has only one value"""
     try:
         assert len(value) != 1, 1
         assert len(value) != 0, 0

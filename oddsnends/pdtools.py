@@ -21,7 +21,7 @@ __all__ = [
     "group_identical_rows",
     "pipe_concat",
     "get_level_uniques",
-    "ordered_fillna",
+    # "ordered_fillna",
     "pivot_indexed_table",
     "rank_sort",
     "reorder_cols",
@@ -277,7 +277,7 @@ def ordered_fillna(
 ) -> pd.DataFrame | None:
     """Progressive fillna according to an ordered `order` list
 
-    gff3: pd.DataFrame
+    df: pd.DataFrame
         DataFrame must contain columns in `order`
     label:  Hashable
         Column label to fill, either existing or new. Default "name"
@@ -684,3 +684,5 @@ def swap_index(
 
         case _:
             raise TypeError("Bad 'frame' type", type(frame))
+
+
