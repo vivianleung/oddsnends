@@ -110,3 +110,5 @@ ENV/
 .idea/
 .DS_Store
 
+.vscode/
+.DS_Store

@@ -1,7 +1,6 @@
 {% set pyproject_toml = load_file_data('pyproject.toml', from_recipe_dir=True) %}
 {% set name = pyproject_toml.get('project').get('name') %}
-{% set version = load_file_regex(load_file='VERSION', regex_pattern=r"^VERSION = ['\"](^['\"]+)") %}
-
+{% set version = load_file_regex(load_file='VERSION', regex_pattern='^VERSION = ["\']([^"\']+)["\']') %}
 {% set requirements = load_file_data("environment.yml", from_recipe_dir=True) %}
 {% set requirements_build = load_file_data("environment_build.yml", from_recipe_dir=True) %}
 
@@ -11,10 +10,13 @@ package:
   version: "{{ version }}"
 
 source:
-  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
-  sha256: 0cb9087283aedad01e7a2b02c79c2b6eb9a85e808fec23f6b7c954d5b3871127
-  requirements: "requirements.txt"
+  git_rev: v0.3.3
+  git_url: https://github.com/vivianleung/oddsnends.git
 
+# source:
+#   url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+#   sha256: 6d347a9f05452513136d5cf95b0e09e176b4ffff6d29c383e255f0be0ce28126
+#   requirements: "requirements.txt"
 
 build:
   noarch: python
@@ -38,7 +40,7 @@ requirements:
 
 
 about:
-  home: https://github.com/vivianleung/genomicspy.git
+  home: https://github.com/vivianleung/oddsnends.git
   license: MIT
   license_family: MIT
-  summary: Miscellaneous data science methods
+  summary: Miscellaneous functions and such
